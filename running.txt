@@ -39,5 +39,8 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/ima
 
 
 
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model $MODEL -b 128 --lr 1e-3 --drop-path $DROP_PATH --apex-amp > train_poolformer_s12.out &
+
 SPACH
 nohup python -m torch.distributed.launch --nproc_per_node 8 --use_env main.py --model shiftvit_r4_base --data-path /dev/shm/imagenet/ --output_dir checkpoint/shiftvit_r4_base --dist-eval > train_shiftvit_r4_base.out &
