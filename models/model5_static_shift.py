@@ -1,5 +1,6 @@
 
 """
+Based on model1, change xy shift to corner shift
 Based on PoolFormer, change to static shift.
 """
 import os
@@ -127,10 +128,10 @@ class Shifting(nn.Module):
         g = C // self.n_groups
         out = torch.zeros_like(x)
 
-        out[:, g * 0:g * 1, :, :-1] = x[:, g * 0:g * 1, :, 1:]  # shift left
-        out[:, g * 1:g * 2, :, 1:] = x[:, g * 1:g * 2, :, :-1]  # shift right
-        out[:, g * 2:g * 3, :-1, :] = x[:, g * 2:g * 3, 1:, :]  # shift up
-        out[:, g * 3:g * 4, 1:, :] = x[:, g * 3:g * 4, :-1, :]  # shift down
+        out[:, g * 0:g * 1, :-1, :-1] = x[:, g * 0:g * 1, 1:, 1:]  # shift left-top
+        out[:, g * 1:g * 2, 1:, :-1] = x[:, g * 1:g * 2, :-1, 1:]  # shift right-top
+        out[:, g * 2:g * 3, :-1, 1:] = x[:, g * 2:g * 3, 1:, :-1]  # shift left-bottom
+        out[:, g * 3:g * 4, 1:, 1:] = x[:, g * 3:g * 4, :-1, :-1]  # shift right-bottom
 
         out[:, g * 4:, :, :] = x[:, g * 4:, :, :]  # no shift
         return out
@@ -419,7 +420,7 @@ class PoolFormer(nn.Module):
 
 
 @register_model
-def model1_static_shiftformer_s12(pretrained=False, **kwargs):
+def model5_static_shiftformer_s12(pretrained=False, **kwargs):
     """
     PoolFormer-S12 model, Params: 12M
     --layers: [x,x,x,x], numbers of layers for the four stages
@@ -440,39 +441,27 @@ def model1_static_shiftformer_s12(pretrained=False, **kwargs):
 
 
 @register_model
-def model1_static_shiftformer_s12_n16(pretrained=False, **kwargs):
-
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
+def poolformer_m48(pretrained=False, **kwargs):
+    """
+    PoolFormer-M48 model, Params: 73M
+    """
+    layers = [8, 8, 24, 8]
+    embed_dims = [96, 192, 384, 768]
     mlp_ratios = [4, 4, 4, 4]
     downsamples = [True, True, True, True]
     model = PoolFormer(
         layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples, n_groups=16,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        layer_scale_init_value=1e-6,
         **kwargs)
-    model.default_cfg = default_cfgs['poolformer_s']
+    model.default_cfg = default_cfgs['poolformer_m']
     return model
-
-@register_model
-def model1_static_shiftformer_s12_n8(pretrained=False, **kwargs):
-
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    downsamples = [True, True, True, True]
-    model = PoolFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples, n_groups=8,
-        **kwargs)
-    model.default_cfg = default_cfgs['poolformer_s']
-    return model
-
 
 
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = model1_static_shiftformer_s12_n16()
+    model = model5_static_shiftformer_s12()
     out = model(input)
     print(model)
     print(out.shape)
