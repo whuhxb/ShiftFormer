@@ -29,11 +29,11 @@ parser.add_argument('--shape', type=int, default=224, help='path to image')
 # Model parameters
 parser.add_argument('--model', default='deit_base_patch16_224', type=str, metavar='MODEL',
                     help='Name of model to train (default: "resnet50"')
-parser.add_argument('--layer', default=0, type=int,
-                    help='Index of visualized block')
-parser.add_argument('--head', default=1, type=int,
+parser.add_argument('--layer', default=11, type=int,
+                    help='Index of visualized block, 0-11')
+parser.add_argument('--head', default=9, type=int,
                     help='Index of visualized attention head')
-parser.add_argument('--query', default=23, type=int,
+parser.add_argument('--query', default=143, type=int,
                     help='Index of query patch, ranging from (0-195), 14x14')
 
 args = parser.parse_args()
@@ -60,7 +60,6 @@ def get_attention_score(self, input, output):
     # https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
     # token number is 197, remove the first one, class token.
     x = input[0] # input tensor in a tuple
-    print(f'hook input shape is {x.shape}')
     B, N, C = x.shape
     qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
     q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
@@ -69,7 +68,6 @@ def get_attention_score(self, input, output):
     attn = attn.softmax(dim=-1)
     global attention
     attention = attn.detach()
-    print(f'hook attn shape is {attention.shape}')
 
 
 
@@ -95,7 +93,6 @@ def main():
     image = image.unsqueeze(dim=0)
     model = timm.create_model(model_name=args.model,pretrained=True)
     model.blocks[args.layer].attn.register_forward_hook(get_attention_score)
-    # print(model)
     out = model(image)
     possibility = torch.softmax(out,dim=1).max()
     value, index = torch.max(out, dim=1)
@@ -123,7 +120,8 @@ def main():
     mask = F.interpolate(mask,(224,224))
     mask = mask.squeeze(dim=0).permute(1,2,0)
     mask = (mask -mask.min())/(mask.max()-mask.min()) # normalize to 0-1
-    show_cam_on_image(args.image, mask, f"images/out/{image_name}_Q{args.query}_H{args.head}.png",  is_query=False)
+    show_cam_on_image(args.image, mask, f"images/out/{image_name}_Q{args.query}_L{args.layer}_H{args.head}.png",  is_query=False)
+    print(f"Atten image is saved to: images/out/{image_name}_Q{args.query}_L{args.layer}_H{args.head}.png")
     # print(f"attention shape is {attention.shape}")
 
 
