@@ -1,6 +1,6 @@
 
 """
-Based on model2_static_shift, remove shifting; that is, no token mixer introduced.
+    Based on model2_static_shift, remove shifting; that is, no token mixer introduced.
 Based on PoolFormer, change to static shift.
 """
 import os
