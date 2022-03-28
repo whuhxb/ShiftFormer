@@ -440,6 +440,27 @@ def model1_static_shiftformer_s12(pretrained=False, **kwargs):
 
 
 @register_model
+def model1_static_shiftformer_s24(pretrained=False, **kwargs):
+    """
+    PoolFormer-S12 model, Params: 12M
+    --layers: [x,x,x,x], numbers of layers for the four stages
+    --embed_dims, --mlp_ratios:
+        embedding dims and mlp ratios for the four stages
+    --downsamples: flags to apply downsampling or not in four blocks
+    """
+    layers = [4, 4, 12, 4]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        **kwargs)
+    model.default_cfg = default_cfgs['poolformer_s']
+    return model
+
+
+@register_model
 def model1_static_shiftformer_s12_n16(pretrained=False, **kwargs):
 
     layers = [2, 2, 6, 2]
