@@ -9,3 +9,4 @@ from .model5_static_shift import model5_static_shiftformer_s12
 from .model6_static_shift import model6_static_shiftformer_s12
 from .van import van_small
 from .model7_static_shift import model7_static_shiftformer_s12
+from .model8_static_shift import model8_static_shiftformer_s12
