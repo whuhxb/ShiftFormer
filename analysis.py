@@ -7,7 +7,7 @@ import fvcore.common
 from fvcore.nn import FlopCountAnalysis
 
 
-model = models.model8_static_shiftformer_s12()
+model = models.model1_static_shiftformer_s24()
 
 inputs = (torch.randn((1,3,224,224)),)
 k = 1000.0
