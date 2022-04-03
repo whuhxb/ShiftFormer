@@ -117,6 +117,8 @@ class ConvMix(nn.Module):
             self.conv = nn.Conv2d(channel, channel, kernel_size=5, groups=channel, padding=2)
         if convmode == "7x7":
             self.conv = nn.Conv2d(channel, channel, kernel_size=7, groups=channel, padding=3)
+        if convmode == "9x9":
+            self.conv = nn.Conv2d(channel, channel, kernel_size=9, groups=channel, padding=4)
         if convmode == "3x3+7x7":
             self.conv = nn.Sequential(
                 nn.Conv2d(channel, channel, kernel_size=3, groups=channel, padding=1),
@@ -461,6 +463,20 @@ def model9_s12_7x7(pretrained=False, **kwargs):
     model.default_cfg = default_cfgs['poolformer_s']
     return model
 
+@register_model
+def model9_s12_9x9(pretrained=False, **kwargs):
+    convmode="9x9"
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims, convmode=convmode,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        **kwargs)
+    model.default_cfg = default_cfgs['poolformer_s']
+    return model
+
 
 @register_model
 def model9_s12_3x3_7x7(pretrained=False, **kwargs):
@@ -494,7 +510,7 @@ def model9_s12_3x3dilated2(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = model9_s12_3x3dilated2()
+    model = model9_s12_9x9()
     out = model(input)
     # print(model)
     print(out.shape)

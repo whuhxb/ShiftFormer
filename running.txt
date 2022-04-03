@@ -29,6 +29,18 @@ https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar
 
 
 ```````to run```````
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model9_s12_3x3 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model9_s12_3x3.out &
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model9_s12_5x5 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model9_s12_5x5.out &
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model9_s12_3x3dilated2 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model9_s12_3x3dilated2.out &
+
+
+
+
+
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model5_static_shiftformer_s12 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model5_static_shiftformer_s12.out &
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model6_static_shiftformer_s12 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model6_static_shiftformer_s12.out &
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model1_static_shiftformer_s12_n8 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model1_static_shiftformer_s12_n8.out &
