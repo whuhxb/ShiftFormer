@@ -504,7 +504,7 @@ def model8_static_shiftformer_s24(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = model8_static_shiftformer_s12_n16()
+    model = model8_static_shiftformer_s12()
     out = model(input)
     print(model)
     print(out.shape)

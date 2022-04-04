@@ -29,6 +29,21 @@ https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar
 
 
 ```````to run```````
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model9_s12_7x7 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model9_s12_7x7.out &
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model9_s12_9x9 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model9_s12_9x9.out &
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model9_s12_3x3_7x7 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model9_s12_3x3_7x7.out &
+
+
+
+
+
+
+
+
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 nohup ./distributed_train.sh 8 /dev/shm/imagenet/ --model model9_s12_3x3 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp > train_model9_s12_3x3.out &
 
 
