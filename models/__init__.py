@@ -12,5 +12,7 @@ from .model7_static_shift import model7_static_shiftformer_s12
 from .model8_static_shift import model8_static_shiftformer_s12
 from .model9_conv_former import model9_s12_3x3, model9_s12_5x5, model9_s12_3x3dilated2, model9_s12_7x7, \
     model9_s12_3x3_7x7, model9_s12_9x9, model9_s12_3x3_7x7dilated2
+from .model10_static_shift import model10_static_shiftformer_s12, model10_static_shiftformer_s12_8844, model10_static_shiftformer_s24_8844
+
 
 from .conv_pd_former import conv_pd_s12_pda, conv_pd_s12_pdb
