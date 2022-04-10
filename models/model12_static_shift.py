@@ -130,8 +130,8 @@ class TokenMixer(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.dim=dim
-        self.smallconv = nn.Conv2d(dim, dim, 3, stride=3, padding=1)
-        self.bigconv = nn.Conv2d(dim, dim, 7, stride=7, padding=3)
+        self.smallconv = nn.Conv2d(dim, dim, 3, groups=dim, stride=3, padding=1)
+        self.bigconv = nn.Conv2d(dim, dim, 7, groups=dim, stride=7, padding=3)
 
     def forward(self, x):
         _,_,W,H = x.size()
