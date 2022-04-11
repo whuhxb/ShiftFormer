@@ -64,7 +64,7 @@ class SpatialAtt(nn.Module):
     def __init__(self, dim, s_att_ks=7, s_att_r=4):
         super().__init__()
         self.spatial_att = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2),
-                                    nn.BatchNorm2d(dim),
+                                    # nn.BatchNorm2d(dim),
                                     nn.Sigmoid())
 
     def forward(self,x):
@@ -174,12 +174,11 @@ class ChannelMixer(nn.Module):
 
 
 class Block(nn.Module):
-
-    def __init__(self, dim, mlp_ratio=4., drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, useSpatialAtt=True, useChannelAtt=True):
+    def __init__(self, dim, mlp_ratio=4., drop=0., drop_path=0., act_layer=nn.GELU,
+                 norm_layer=nn.LayerNorm, useBN=True, useSpatialAtt=True, useChannelAtt=True):
         super().__init__()
         self.norm1 = norm_layer(dim)
-        self.token_mixer = TokenMixer(dim=dim, useSpatialAtt=useSpatialAtt)
+        self.token_mixer = TokenMixer(dim=dim, useBN=useBN, useSpatialAtt=useSpatialAtt)
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -216,7 +215,7 @@ class BaseTransformer(nn.Module):
     def __init__(self, in_chans=3, num_classes=1000, embed_dims=[64, 128, 256, 512],
                   mlp_ratios=[4, 4, 4, 4], drop_rate=0.
                  , drop_path_rate=0., norm_layer=GroupNorm, act_layer=nn.GELU,
-                 depths=[3, 4, 6, 3], num_stages=4, useSpatialAtt=True, useChannelAtt=True):
+                 depths=[3, 4, 6, 3], num_stages=4, useBN=True, useSpatialAtt=True, useChannelAtt=True):
         super().__init__()
         self.num_classes = num_classes
         self.depths = depths
@@ -234,7 +233,7 @@ class BaseTransformer(nn.Module):
             block = nn.ModuleList([Block(
                 dim=embed_dims[i],  mlp_ratio=mlp_ratios[i],
                 drop=drop_rate, drop_path=dpr[cur + j], act_layer=act_layer, norm_layer=norm_layer,
-                useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt)
+                useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt)
                 for j in range(depths[i])])
             norm = norm_layer(embed_dims[i])
             cur += depths[i]
@@ -302,7 +301,7 @@ class BaseTransformer(nn.Module):
 def fct_s12_32(pretrained=False, **kwargs):
     model = BaseTransformer(
         embed_dims=[32, 64, 160, 256], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=GroupNorm, depths=[2, 2, 6, 2], useSpatialAtt=False, useChannelAtt=False,
+        norm_layer=GroupNorm, depths=[2, 2, 6, 2], useBN=False, useSpatialAtt=False, useChannelAtt=False,
         **kwargs)
     model.default_cfg = _cfg()
     return model
