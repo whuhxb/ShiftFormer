@@ -15,5 +15,5 @@ from .model9_conv_former import model9_s12_3x3, model9_s12_5x5, model9_s12_3x3di
 from .model10_static_shift import model10_static_shiftformer_s12, model10_static_shiftformer_s12_8844, model10_static_shiftformer_s24_8844
 from .model11_static_shift import model11_s12
 from .model12_static_shift import model12_s12
-
+from .model13_full_conv_transformer import fct_s12_32, fct_s12_32_att, fct_s12_64_att, fct_s24_64_att
 from .conv_pd_former import conv_pd_s12_pda, conv_pd_s12_pdb
