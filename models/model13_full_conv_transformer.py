@@ -293,7 +293,7 @@ class BaseTransformer(nn.Module):
 def fct_s12_32(pretrained=False, **kwargs):
     model = BaseTransformer(
         embed_dims=[32, 64, 160, 256], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=partial(GroupNorm, eps=1e-6), depths=[2, 2, 6, 2], useSpatialAtt=False, useChannelAtt=False,
+        norm_layer=GroupNorm, depths=[2, 2, 6, 2], useSpatialAtt=False, useChannelAtt=False,
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -302,7 +302,7 @@ def fct_s12_32(pretrained=False, **kwargs):
 def fct_s12_32_att(pretrained=False, **kwargs):
     model = BaseTransformer(
         embed_dims=[32, 64, 160, 256], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=partial(GroupNorm, eps=1e-6), depths=[2, 2, 6, 2], useSpatialAtt=True, useChannelAtt=True,
+        norm_layer=GroupNorm, depths=[2, 2, 6, 2], useSpatialAtt=True, useChannelAtt=True,
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -312,7 +312,7 @@ def fct_s12_32_att(pretrained=False, **kwargs):
 def fct_s12_64_att(pretrained=False, **kwargs):
     model = BaseTransformer(
         embed_dims=[64, 128, 320, 512], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=partial(GroupNorm, eps=1e-6), depths=[2, 2, 6, 2], useSpatialAtt=True, useChannelAtt=True,
+        norm_layer=GroupNorm, depths=[2, 2, 6, 2], useSpatialAtt=True, useChannelAtt=True,
         **kwargs)
     model.default_cfg = _cfg()
     return model
@@ -321,7 +321,7 @@ def fct_s12_64_att(pretrained=False, **kwargs):
 def fct_s24_64_att(pretrained=False, **kwargs):
     model = BaseTransformer(
         embed_dims=[64, 128, 320, 512], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=partial(GroupNorm, eps=1e-6), depths=[4, 4, 12, 4], useSpatialAtt=True, useChannelAtt=True,
+        norm_layer=GroupNorm, depths=[4, 4, 12, 4], useSpatialAtt=True, useChannelAtt=True,
         **kwargs)
     model.default_cfg = _cfg()
     return model
