@@ -49,26 +49,38 @@ default_cfgs = {
 }
 
 
-class PatchEmbed(nn.Module):
+class OverlapPatchEmbed(nn.Module):
+    """ Image to Patch Embedding
     """
-    Patch Embedding that is implemented by a layer of conv.
-    Input: tensor in shape [B, C, H, W]
-    Output: tensor in shape [B, C, H/stride, W/stride]
-    """
-    def __init__(self, patch_size=16, stride=16, padding=0,
-                 in_chans=3, embed_dim=768, norm_layer=None):
+
+    def __init__(self, patch_size=7, stride=4, in_chans=3, embed_dim=768):
         super().__init__()
         patch_size = to_2tuple(patch_size)
-        stride = to_2tuple(stride)
-        padding = to_2tuple(padding)
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size,
-                              stride=stride, padding=padding)
-        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
+                              padding=(patch_size[0] // 2, patch_size[1] // 2))
+        self.norm = GroupNorm(embed_dim)
+        # self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, (nn.LayerNorm,nn.GroupNorm, nn.LayerNorm)):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+        elif isinstance(m, nn.Conv2d):
+            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+            fan_out //= m.groups
+            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
+            if m.bias is not None:
+                m.bias.data.zero_()
 
     def forward(self, x):
         x = self.proj(x)
         x = self.norm(x)
         return x
+
 
 
 class GroupNorm(nn.GroupNorm):
@@ -228,9 +240,7 @@ class BaseFormer(nn.Module):
             self.num_classes = num_classes
         self.fork_feat = fork_feat
 
-        self.patch_embed = PatchEmbed(
-            patch_size=in_patch_size, stride=in_stride, padding=in_pad,
-            in_chans=3, embed_dim=embed_dims[0])
+        self.patch_embed = OverlapPatchEmbed(patch_size=7, stride=4, in_chans=3, embed_dim=embed_dims[0])
 
         # set the main block in network
         network = []
@@ -248,11 +258,15 @@ class BaseFormer(nn.Module):
             if downsamples[i] or embed_dims[i] != embed_dims[i+1]:
                 # downsampling between two stages
                 network.append(
-                    PatchEmbed(
-                        patch_size=down_patch_size, stride=down_stride,
-                        padding=down_pad,
-                        in_chans=embed_dims[i], embed_dim=embed_dims[i+1]
-                        )
+                    # PatchEmbed(
+                    #     patch_size=down_patch_size, stride=down_stride,
+                    #     padding=down_pad,
+                    #     in_chans=embed_dims[i], embed_dim=embed_dims[i+1]
+                    #     )
+                    OverlapPatchEmbed(patch_size= 3,
+                                            stride= 2,
+                                            in_chans=embed_dims[i],
+                                            embed_dim=embed_dims[i+1])
                     )
 
         self.network = nn.ModuleList(network)
