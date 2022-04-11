@@ -1,12 +1,36 @@
+
+"""
+Based on PoolFormer, change to static shift.
+"""
+import os
+import copy
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from functools import partial
 
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-import math
+from timm.models.layers import DropPath, trunc_normal_
+from timm.models.registry import register_model
+from timm.models.layers.helpers import to_2tuple
+
+
+try:
+    from mmseg.models.builder import BACKBONES as seg_BACKBONES
+    from mmseg.utils import get_root_logger
+    from mmcv.runner import _load_checkpoint
+    has_mmseg = True
+except ImportError:
+    # print("If for semantic segmentation, please install mmsegmentation first")
+    has_mmseg = False
+
+try:
+    from mmdet.models.builder import BACKBONES as det_BACKBONES
+    from mmdet.utils import get_root_logger
+    from mmcv.runner import _load_checkpoint
+    has_mmdet = True
+except ImportError:
+    # print("If for detection, please install mmdetection first")
+    has_mmdet = False
+
 
 def _cfg(url='', **kwargs):
     return {
@@ -18,6 +42,55 @@ def _cfg(url='', **kwargs):
         **kwargs
     }
 
+
+default_cfgs = {
+    'poolformer_s': _cfg(crop_pct=0.9),
+    'poolformer_m': _cfg(crop_pct=0.95),
+}
+
+
+class PatchEmbed(nn.Module):
+    """
+    Patch Embedding that is implemented by a layer of conv.
+    Input: tensor in shape [B, C, H, W]
+    Output: tensor in shape [B, C, H/stride, W/stride]
+    """
+    def __init__(self, patch_size=16, stride=16, padding=0,
+                 in_chans=3, embed_dim=768, norm_layer=None):
+        super().__init__()
+        patch_size = to_2tuple(patch_size)
+        stride = to_2tuple(stride)
+        padding = to_2tuple(padding)
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size,
+                              stride=stride, padding=padding)
+        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+
+    def forward(self, x):
+        x = self.proj(x)
+        x = self.norm(x)
+        return x
+
+
+class LayerNormChannel(nn.Module):
+    """
+    LayerNorm only for Channel Dimension.
+    Input: tensor in shape [B, C, H, W]
+    """
+    def __init__(self, num_channels, eps=1e-05):
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(num_channels))
+        self.bias = nn.Parameter(torch.zeros(num_channels))
+        self.eps = eps
+
+    def forward(self, x):
+        u = x.mean(1, keepdim=True)
+        s = (x - u).pow(2).mean(1, keepdim=True)
+        x = (x - u) / torch.sqrt(s + self.eps)
+        x = self.weight.unsqueeze(-1).unsqueeze(-1) * x \
+            + self.bias.unsqueeze(-1).unsqueeze(-1)
+        return x
+
+
 class GroupNorm(nn.GroupNorm):
     """
     Group Normalization with 1 group.
@@ -27,316 +100,400 @@ class GroupNorm(nn.GroupNorm):
         super().__init__(1, num_channels, **kwargs)
 
 
-class OverlapPatchEmbed(nn.Module):
-    """ Image to Patch Embedding
+class Pooling(nn.Module):
     """
-
-    def __init__(self, patch_size=7, stride=4, in_chans=3, embed_dim=768):
+    Implementation of pooling for PoolFormer
+    --pool_size: pooling size
+    """
+    def __init__(self, pool_size=3):
         super().__init__()
-        patch_size = to_2tuple(patch_size)
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
-                              padding=(patch_size[0] // 2, patch_size[1] // 2))
-        self.norm = GroupNorm(embed_dim)
-        # self.apply(self._init_weights)
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, (nn.LayerNorm,nn.GroupNorm, nn.LayerNorm)):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-        elif isinstance(m, nn.Conv2d):
-            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-            fan_out //= m.groups
-            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
-            if m.bias is not None:
-                m.bias.data.zero_()
+        self.pool = nn.AvgPool2d(
+            pool_size, stride=1, padding=pool_size//2, count_include_pad=False)
 
     def forward(self, x):
-        x = self.proj(x)
-        x = self.norm(x)
-        return x
+        return self.pool(x) - x
 
-
-class SpatialAtt(nn.Module):
-    def __init__(self, dim, s_att_ks=7, s_att_r=4):
+class Shifting(nn.Module):
+    """
+    Implementation of Shifting for ShiftFormer
+    --n_groups: divide c channel to n-groups
+    """
+    def __init__(self, n_groups=12):
         super().__init__()
-        self.spatial_att = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2),
-                                    # nn.BatchNorm2d(dim),
-                                    nn.Sigmoid())
-
-    def forward(self,x):
-        _,_,H,W = x.size()
-        # print(f"spatial att shape: {x.size()}")
-        return x * F.interpolate(self.spatial_att(x), (H,W))
-
-
-
-class ChannelAtt(nn.Module):
-    def __init__(self, dim, c_att_ks=7, c_att_r=8):
-        super().__init__()
-        self.hidden_dim=max(8, dim//c_att_r)
-        self.channel_att = nn.Sequential(
-            nn.AvgPool2d(c_att_ks, c_att_ks, padding=c_att_ks//2),
-            nn.Conv2d(dim, self.hidden_dim, 1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(self.hidden_dim, dim, 1),
-            nn.Sigmoid()
-        )
-
-    def forward(self,x):
-        _,_,H,W = x.size()
-        # print(f"channel att shape: {x.size()}")
-        return x * F.interpolate(self.channel_att(x), (H,W))
-
-class TokenMixer(nn.Module):
-    def __init__(self, dim, act_layer=nn.GELU, useBN=True, useSpatialAtt=True):
-        super().__init__()
-        self.act = act_layer()
-        self.useBN = useBN
-        self.useSpatialAtt = useSpatialAtt
-        self.dw3x3 = nn.Conv2d(dim, dim, kernel_size=3, padding=1, stride=1, groups=dim)
-        self.fc = nn.Conv2d(dim,dim,kernel_size=1, padding=0, stride=1, groups=1)
-        self.dw5x5dilated = nn.Conv2d(dim, dim, kernel_size=5, padding=4, stride=1, groups=dim, dilation=2)
-        if useBN:
-            self.dw3x3BN = nn.BatchNorm2d(dim)
-            self.dw5x5dilatedBN = nn.BatchNorm2d(dim)
-
-        if useSpatialAtt:
-            self.spatial_att = SpatialAtt(dim=dim)
-
-        # self.apply(self._init_weights)
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, (nn.LayerNorm,nn.GroupNorm, nn.LayerNorm)):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-        elif isinstance(m, nn.Conv2d):
-            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-            fan_out //= m.groups
-            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
-            if m.bias is not None:
-                m.bias.data.zero_()
+        self.n_groups=n_groups
 
     def forward(self, x):
-        x = self.act(self.dw3x3BN(self.dw3x3(x))) if self.useBN else self.act(self.dw3x3(x))
-        x = self.act((self.fc(x)))
-        x = self.act(self.dw5x5dilatedBN(self.dw5x5dilated(x))) if self.useBN else self.act(self.dw5x5dilated(x))
-        if self.useSpatialAtt:
-            x = self.spatial_att(x)
-        return x
+        B, C, H, W = x.shape
+        g = C // self.n_groups
+        out = torch.zeros_like(x)
 
+        out[:, g * 0:g * 1, :, :-1] = x[:, g * 0:g * 1, :, 1:]  # shift left
+        out[:, g * 1:g * 2, :, 1:] = x[:, g * 1:g * 2, :, :-1]  # shift right
+        out[:, g * 2:g * 3, :-1, :] = x[:, g * 2:g * 3, 1:, :]  # shift up
+        out[:, g * 3:g * 4, 1:, :] = x[:, g * 3:g * 4, :-1, :]  # shift down
 
-class ChannelMixer(nn.Module):
-    def __init__(self, dim, hidden_dim=None, act_layer=nn.GELU, drop=0., useChannelAtt=True):
+        out[:, g * 4:, :, :] = x[:, g * 4:, :, :]  # no shift
+        return out
+
+class Mlp(nn.Module):
+    """
+    Implementation of MLP with 1*1 convolutions.
+    Input: tensor with shape [B, C, H, W]
+    """
+    def __init__(self, in_features, hidden_features=None,
+                 out_features=None, act_layer=nn.GELU, drop=0.):
         super().__init__()
-        hidden_dim = hidden_dim or dim
-        self.useChannelAtt = useChannelAtt
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+        self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
         self.act = act_layer()
-        self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
-        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1, bias=True, groups=hidden_dim)
-        self.fc2 = nn.Conv2d(hidden_dim, dim, 1)
+        self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
         self.drop = nn.Dropout(drop)
-        if useChannelAtt:
-            self.channel_att = ChannelAtt(dim)
-        # self.apply(self._init_weights)
+        self.apply(self._init_weights)
 
     def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
+        if isinstance(m, nn.Conv2d):
             trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, (nn.LayerNorm,nn.GroupNorm, nn.LayerNorm)):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-        elif isinstance(m, nn.Conv2d):
-            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-            fan_out //= m.groups
-            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
             if m.bias is not None:
-                m.bias.data.zero_()
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        x = self.act(self.fc1(x))
-        x = self.act(self.dwconv(x))
+        x = self.fc1(x)
+        x = self.act(x)
         x = self.drop(x)
         x = self.fc2(x)
         x = self.drop(x)
-        if self.useChannelAtt:
-            x = self.channel_att(x)
         return x
 
 
-class Block(nn.Module):
-    def __init__(self, dim, mlp_ratio=4., drop=0., drop_path=0., act_layer=nn.GELU,
-                 norm_layer=nn.LayerNorm, useBN=True, useSpatialAtt=True, useChannelAtt=True):
+class PoolFormerBlock(nn.Module):
+    """
+    Implementation of one PoolFormer block.
+    --dim: embedding dim
+    --pool_size: pooling size
+    --mlp_ratio: mlp expansion ratio
+    --act_layer: activation
+    --norm_layer: normalization
+    --drop: dropout rate
+    --drop path: Stochastic Depth,
+        refer to https://arxiv.org/abs/1603.09382
+    --use_layer_scale, --layer_scale_init_value: LayerScale,
+        refer to https://arxiv.org/abs/2103.17239
+    """
+    def __init__(self, dim, n_groups=12, mlp_ratio=4.,
+                 act_layer=nn.GELU, norm_layer=GroupNorm,
+                 drop=0., drop_path=0.,
+                 use_layer_scale=True, layer_scale_init_value=1e-5):
+
         super().__init__()
-        self.norm1 = norm_layer(dim)
-        self.token_mixer = TokenMixer(dim=dim, useBN=useBN, useSpatialAtt=useSpatialAtt)
-        # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+
+        # self.norm1 = norm_layer(dim)
+        self.token_mixer = Shifting(n_groups=n_groups)
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.channel_mixer = ChannelMixer(dim=dim, hidden_dim=mlp_hidden_dim,
-                            act_layer=act_layer, drop=drop, useChannelAtt=useChannelAtt)
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim,
+                       act_layer=act_layer, drop=drop)
 
-        # self.apply(self._init_weights)
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
-            if isinstance(m, nn.Linear) and m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, (nn.LayerNorm,nn.GroupNorm, nn.LayerNorm)):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-        elif isinstance(m, nn.Conv2d):
-            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-            fan_out //= m.groups
-            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
-            if m.bias is not None:
-                m.bias.data.zero_()
+        # The following two techniques are useful to train deep PoolFormers.
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.use_layer_scale = use_layer_scale
+        if use_layer_scale:
+            # self.layer_scale_1 = nn.Parameter(
+            #     layer_scale_init_value * torch.ones((dim)), requires_grad=True)
+            self.layer_scale_2 = nn.Parameter(
+                layer_scale_init_value * torch.ones((dim)), requires_grad=True)
 
     def forward(self, x):
-        x = x + self.drop_path(self.token_mixer(self.norm1(x)))
-        x = x + self.drop_path(self.channel_mixer(self.norm2(x)))
+        if self.use_layer_scale:
+            x = self.token_mixer(x)
+            x = x + self.drop_path(
+                self.layer_scale_2.unsqueeze(-1).unsqueeze(-1)
+                * self.mlp(self.norm2(x)))
+        else:
+            x = x + self.token_mixer(x)
+            x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 
 
+def basic_blocks(dim, index, layers,
+                 n_groups=12, mlp_ratio=4.,
+                 act_layer=nn.GELU, norm_layer=GroupNorm,
+                 drop_rate=.0, drop_path_rate=0.,
+                 use_layer_scale=True, layer_scale_init_value=1e-5):
+    """
+    generate PoolFormer blocks for a stage
+    return: PoolFormer blocks
+    """
+    blocks = []
+    for block_idx in range(layers[index]):
+        block_dpr = drop_path_rate * (
+            block_idx + sum(layers[:index])) / (sum(layers) - 1)
+        blocks.append(PoolFormerBlock(
+            dim, n_groups=n_groups, mlp_ratio=mlp_ratio,
+            act_layer=act_layer, norm_layer=norm_layer,
+            drop=drop_rate, drop_path=block_dpr,
+            use_layer_scale=use_layer_scale,
+            layer_scale_init_value=layer_scale_init_value,
+            ))
+    blocks = nn.Sequential(*blocks)
+
+    return blocks
 
 
-class BaseTransformer(nn.Module):
-    def __init__(self, in_chans=3, num_classes=1000, embed_dims=[64, 128, 256, 512],
-                  mlp_ratios=[4, 4, 4, 4], drop_rate=0.
-                 , drop_path_rate=0., norm_layer=GroupNorm, act_layer=nn.GELU,
-                 depths=[3, 4, 6, 3], num_stages=4, useBN=True, useSpatialAtt=True, useChannelAtt=True):
+class PoolFormer(nn.Module):
+    """
+    PoolFormer, the main class of our model
+    --layers: [x,x,x,x], number of blocks for the 4 stages
+    --embed_dims, --mlp_ratios, --pool_size: the embedding dims, mlp ratios and
+        pooling size for the 4 stages
+    --downsamples: flags to apply downsampling or not
+    --norm_layer, --act_layer: define the types of normalization and activation
+    --num_classes: number of classes for the image classification
+    --in_patch_size, --in_stride, --in_pad: specify the patch embedding
+        for the input image
+    --down_patch_size --down_stride --down_pad:
+        specify the downsample (patch embed.)
+    --fork_feat: whether output features of the 4 stages, for dense prediction
+    --init_cfg, --pretrained:
+        for mmdetection and mmsegmentation to load pretrained weights
+    """
+    def __init__(self, layers, embed_dims=None,
+                 mlp_ratios=None, downsamples=None,
+                 n_groups=12,
+                 norm_layer=GroupNorm, act_layer=nn.GELU,
+                 num_classes=1000,
+                 in_patch_size=7, in_stride=4, in_pad=2,
+                 down_patch_size=3, down_stride=2, down_pad=1,
+                 drop_rate=0., drop_path_rate=0.,
+                 use_layer_scale=True, layer_scale_init_value=1e-5,
+                 fork_feat=False,
+                 init_cfg=None,
+                 pretrained=None,
+                 **kwargs):
+
         super().__init__()
-        self.num_classes = num_classes
-        self.depths = depths
-        self.num_stages = num_stages
 
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
-        cur = 0
+        if not fork_feat:
+            self.num_classes = num_classes
+        self.fork_feat = fork_feat
 
-        for i in range(num_stages):
-            patch_embed = OverlapPatchEmbed(patch_size=7 if i == 0 else 3,
-                                            stride=4 if i == 0 else 2,
-                                            in_chans=in_chans if i == 0 else embed_dims[i - 1],
-                                            embed_dim=embed_dims[i])
+        self.patch_embed = PatchEmbed(
+            patch_size=in_patch_size, stride=in_stride, padding=in_pad,
+            in_chans=3, embed_dim=embed_dims[0])
 
-            block = nn.ModuleList([Block(
-                dim=embed_dims[i],  mlp_ratio=mlp_ratios[i],
-                drop=drop_rate, drop_path=dpr[cur + j], act_layer=act_layer, norm_layer=norm_layer,
-                useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt)
-                for j in range(depths[i])])
-            norm = norm_layer(embed_dims[i])
-            cur += depths[i]
+        # set the main block in network
+        network = []
+        for i in range(len(layers)):
+            stage = basic_blocks(embed_dims[i], i, layers,
+                                 n_groups=n_groups, mlp_ratio=mlp_ratios[i],
+                                 act_layer=act_layer, norm_layer=norm_layer,
+                                 drop_rate=drop_rate,
+                                 drop_path_rate=drop_path_rate,
+                                 use_layer_scale=use_layer_scale,
+                                 layer_scale_init_value=layer_scale_init_value)
+            network.append(stage)
+            if i >= len(layers) - 1:
+                break
+            if downsamples[i] or embed_dims[i] != embed_dims[i+1]:
+                # downsampling between two stages
+                network.append(
+                    PatchEmbed(
+                        patch_size=down_patch_size, stride=down_stride,
+                        padding=down_pad,
+                        in_chans=embed_dims[i], embed_dim=embed_dims[i+1]
+                        )
+                    )
 
-            setattr(self, f"patch_embed{i + 1}", patch_embed)
-            setattr(self, f"block{i + 1}", block)
-            setattr(self, f"norm{i + 1}", norm)
+        self.network = nn.ModuleList(network)
 
-        # classification head
-        self.head = nn.Linear(embed_dims[3], num_classes) if num_classes > 0 else nn.Identity()
+        if self.fork_feat:
+            # add a norm layer for each output
+            self.out_indices = [0, 2, 4, 6]
+            for i_emb, i_layer in enumerate(self.out_indices):
+                if i_emb == 0 and os.environ.get('FORK_LAST3', None):
+                    # TODO: more elegant way
+                    """For RetinaNet, `start_level=1`. The first norm layer will not used.
+                    cmd: `FORK_LAST3=1 python -m torch.distributed.launch ...`
+                    """
+                    layer = nn.Identity()
+                else:
+                    layer = norm_layer(embed_dims[i_emb])
+                layer_name = f'norm{i_layer}'
+                self.add_module(layer_name, layer)
+        else:
+            # Classifier head
+            self.norm = norm_layer(embed_dims[-1])
+            self.head = nn.Linear(
+                embed_dims[-1], num_classes) if num_classes > 0 \
+                else nn.Identity()
 
-        # self.apply(self._init_weights)
+        self.apply(self.cls_init_weights)
 
-    def _init_weights(self, m):
+        self.init_cfg = copy.deepcopy(init_cfg)
+        # load pre-trained model
+        if self.fork_feat and (
+                self.init_cfg is not None or pretrained is not None):
+            self.init_weights()
+
+    # init for classification
+    def cls_init_weights(self, m):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
-        elif isinstance(m, (nn.LayerNorm,nn.GroupNorm, nn.LayerNorm)):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-        elif isinstance(m, nn.Conv2d):
-            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-            fan_out //= m.groups
-            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
-            if m.bias is not None:
-                m.bias.data.zero_()
 
+    # init for mmdetection or mmsegmentation by loading
+    # imagenet pre-trained weights
+    def init_weights(self, pretrained=None):
+        logger = get_root_logger()
+        if self.init_cfg is None and pretrained is None:
+            logger.warn(f'No pre-trained weights for '
+                        f'{self.__class__.__name__}, '
+                        f'training start from scratch')
+            pass
+        else:
+            assert 'checkpoint' in self.init_cfg, f'Only support ' \
+                                                  f'specify `Pretrained` in ' \
+                                                  f'`init_cfg` in ' \
+                                                  f'{self.__class__.__name__} '
+            if self.init_cfg is not None:
+                ckpt_path = self.init_cfg['checkpoint']
+            elif pretrained is not None:
+                ckpt_path = pretrained
 
-    @torch.jit.ignore
-    def no_weight_decay(self):
-        return {'pos_embed1', 'pos_embed2', 'pos_embed3', 'pos_embed4', 'cls_token'}  # has pos_embed may be better
+            ckpt = _load_checkpoint(
+                ckpt_path, logger=logger, map_location='cpu')
+            if 'state_dict' in ckpt:
+                _state_dict = ckpt['state_dict']
+            elif 'model' in ckpt:
+                _state_dict = ckpt['model']
+            else:
+                _state_dict = ckpt
+
+            state_dict = _state_dict
+            missing_keys, unexpected_keys = \
+                self.load_state_dict(state_dict, False)
+
+            # show for debug
+            # print('missing_keys: ', missing_keys)
+            # print('unexpected_keys: ', unexpected_keys)
 
     def get_classifier(self):
         return self.head
 
-    def reset_classifier(self, num_classes, global_pool=''):
+    def reset_classifier(self, num_classes):
         self.num_classes = num_classes
-        self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        self.head = nn.Linear(
+            self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
-    def forward_features(self, x):
-        for i in range(self.num_stages):
-            patch_embed = getattr(self, f"patch_embed{i + 1}")
-            block = getattr(self, f"block{i + 1}")
-            norm = getattr(self, f"norm{i + 1}")
-            x = patch_embed(x)
-            for blk in block:
-                x = blk(x)
-            x = norm(x)
-            # if i != self.num_stages - 1:
-            #     x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
-
-        return x.mean([-2, -1])
-
-    def forward(self, x):
-        x = self.forward_features(x)
-        x = self.head(x)
-
+    def forward_embeddings(self, x):
+        x = self.patch_embed(x)
         return x
 
+    def forward_tokens(self, x):
+        outs = []
+        for idx, block in enumerate(self.network):
+            x = block(x)
+            if self.fork_feat and idx in self.out_indices:
+                norm_layer = getattr(self, f'norm{idx}')
+                x_out = norm_layer(x)
+                outs.append(x_out)
+        if self.fork_feat:
+            # output the features of four stages for dense prediction
+            return outs
+        # output only the features of last layer for image classification
+        return x
 
+    def forward(self, x):
+        # input embedding
+        x = self.forward_embeddings(x)
+        # through backbone
+        x = self.forward_tokens(x)
+        if self.fork_feat:
+            # otuput features of four stages for dense prediction
+            return x
+        x = self.norm(x)
+        cls_out = self.head(x.mean([-2, -1]))
+        # for image classification
+        return cls_out
 
 
 @register_model
 def fct_s12_32(pretrained=False, **kwargs):
-    model = BaseTransformer(
-        embed_dims=[32, 64, 160, 256], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=GroupNorm, depths=[2, 2, 6, 2], useBN=False, useSpatialAtt=False, useChannelAtt=False,
+    """
+    PoolFormer-S12 model, Params: 12M
+    --layers: [x,x,x,x], numbers of layers for the four stages
+    --embed_dims, --mlp_ratios:
+        embedding dims and mlp ratios for the four stages
+    --downsamples: flags to apply downsampling or not in four blocks
+    """
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
         **kwargs)
-    model.default_cfg = _cfg()
+    model.default_cfg = default_cfgs['poolformer_s']
     return model
+
 
 @register_model
 def fct_s12_32_att(pretrained=False, **kwargs):
-    model = BaseTransformer(
-        embed_dims=[32, 64, 160, 256], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=GroupNorm, depths=[2, 2, 6, 2], useSpatialAtt=True, useChannelAtt=True,
+    """
+    PoolFormer-S12 model, Params: 12M
+    --layers: [x,x,x,x], numbers of layers for the four stages
+    --embed_dims, --mlp_ratios:
+        embedding dims and mlp ratios for the four stages
+    --downsamples: flags to apply downsampling or not in four blocks
+    """
+    layers = [4, 4, 12, 4]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
         **kwargs)
-    model.default_cfg = _cfg()
+    model.default_cfg = default_cfgs['poolformer_s']
     return model
 
 
 @register_model
 def fct_s12_64_att(pretrained=False, **kwargs):
-    model = BaseTransformer(
-        embed_dims=[64, 128, 320, 512], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=GroupNorm, depths=[2, 2, 6, 2], useSpatialAtt=True, useChannelAtt=True,
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples, n_groups=16,
         **kwargs)
-    model.default_cfg = _cfg()
+    model.default_cfg = default_cfgs['poolformer_s']
     return model
 
 @register_model
 def fct_s24_64_att(pretrained=False, **kwargs):
-    model = BaseTransformer(
-        embed_dims=[64, 128, 320, 512], mlp_ratios=[8, 8, 4, 4],
-        norm_layer=GroupNorm, depths=[4, 4, 12, 4], useSpatialAtt=True, useChannelAtt=True,
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples, n_groups=8,
         **kwargs)
-    model.default_cfg = _cfg()
+    model.default_cfg = default_cfgs['poolformer_s']
     return model
+
+
+
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
     model = fct_s12_32()
     out = model(input)
-    # print(model)
+    print(model)
     print(out.shape)
