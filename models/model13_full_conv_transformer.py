@@ -3,9 +3,11 @@
 Based on PoolFormer, change to static shift.
 """
 import os
+import math
 import copy
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.layers import DropPath, trunc_normal_
@@ -146,6 +148,119 @@ class Mlp(nn.Module):
         return x
 
 
+class SpatialAtt(nn.Module):
+    def __init__(self, dim, s_att_ks=7, s_att_r=4):
+        super().__init__()
+        self.spatial_att = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2),
+                                    # nn.BatchNorm2d(dim),
+                                    nn.Sigmoid())
+
+    def forward(self,x):
+        _,_,H,W = x.size()
+        # print(f"spatial att shape: {x.size()}")
+        return x * F.interpolate(self.spatial_att(x), (H,W))
+
+
+class ChannelAtt(nn.Module):
+    def __init__(self, dim, c_att_ks=7, c_att_r=8):
+        super().__init__()
+        self.hidden_dim=max(8, dim//c_att_r)
+        self.channel_att = nn.Sequential(
+            nn.AvgPool2d(c_att_ks, c_att_ks, padding=c_att_ks//2),
+            nn.Conv2d(dim, self.hidden_dim, 1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(self.hidden_dim, dim, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self,x):
+        _,_,H,W = x.size()
+        # print(f"channel att shape: {x.size()}")
+        return x * F.interpolate(self.channel_att(x), (H,W))
+
+
+class TokenMixer(nn.Module):
+    def __init__(self, dim, act_layer=nn.GELU, useBN=True, useSpatialAtt=True):
+        super().__init__()
+        self.act = act_layer()
+        self.useBN = useBN
+        self.useSpatialAtt = useSpatialAtt
+        self.dw3x3 = nn.Conv2d(dim, dim, kernel_size=3, padding=1, stride=1, groups=dim)
+        self.fc = nn.Conv2d(dim,dim,kernel_size=1, padding=0, stride=1, groups=1)
+        self.dw5x5dilated = nn.Conv2d(dim, dim, kernel_size=5, padding=4, stride=1, groups=dim, dilation=2)
+        if useBN:
+            self.dw3x3BN = nn.BatchNorm2d(dim)
+            self.dw5x5dilatedBN = nn.BatchNorm2d(dim)
+
+        if useSpatialAtt:
+            self.spatial_att = SpatialAtt(dim=dim)
+
+        # self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, (nn.LayerNorm,nn.GroupNorm, nn.LayerNorm)):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+        elif isinstance(m, nn.Conv2d):
+            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+            fan_out //= m.groups
+            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
+            if m.bias is not None:
+                m.bias.data.zero_()
+
+    def forward(self, x):
+        x = self.act(self.dw3x3BN(self.dw3x3(x))) if self.useBN else self.act(self.dw3x3(x))
+        x = self.act((self.fc(x)))
+        x = self.act(self.dw5x5dilatedBN(self.dw5x5dilated(x))) if self.useBN else self.act(self.dw5x5dilated(x))
+        if self.useSpatialAtt:
+            x = self.spatial_att(x)
+        return x
+
+
+class ChannelMixer(nn.Module):
+    def __init__(self, dim, hidden_dim=None, act_layer=nn.GELU, drop=0., useChannelAtt=True):
+        super().__init__()
+        hidden_dim = hidden_dim or dim
+        self.useChannelAtt = useChannelAtt
+        self.act = act_layer()
+        self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
+        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1, bias=True, groups=hidden_dim)
+        self.fc2 = nn.Conv2d(hidden_dim, dim, 1)
+        self.drop = nn.Dropout(drop)
+        if useChannelAtt:
+            self.channel_att = ChannelAtt(dim)
+        # self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, (nn.LayerNorm,nn.GroupNorm, nn.LayerNorm)):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+        elif isinstance(m, nn.Conv2d):
+            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+            fan_out //= m.groups
+            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
+            if m.bias is not None:
+                m.bias.data.zero_()
+
+    def forward(self, x):
+        x = self.act(self.fc1(x))
+        x = self.act(self.dwconv(x))
+        x = self.drop(x)
+        x = self.fc2(x)
+        x = self.drop(x)
+        if self.useChannelAtt:
+            x = self.channel_att(x)
+        return x
+
+
 class BasicBlock(nn.Module):
     """
     Implementation of one PoolFormer block.
@@ -168,7 +283,7 @@ class BasicBlock(nn.Module):
         super().__init__()
 
         # self.norm1 = norm_layer(dim)
-        self.token_mixer = Shifting(n_groups=n_groups)
+        self.token_mixer = TokenMixer(dim=dim)
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim,
@@ -258,16 +373,8 @@ class BaseFormer(nn.Module):
             if downsamples[i] or embed_dims[i] != embed_dims[i+1]:
                 # downsampling between two stages
                 network.append(
-                    # PatchEmbed(
-                    #     patch_size=down_patch_size, stride=down_stride,
-                    #     padding=down_pad,
-                    #     in_chans=embed_dims[i], embed_dim=embed_dims[i+1]
-                    #     )
-                    OverlapPatchEmbed(patch_size= 3,
-                                            stride= 2,
-                                            in_chans=embed_dims[i],
-                                            embed_dim=embed_dims[i+1])
-                    )
+                    OverlapPatchEmbed(patch_size= 3, stride= 2, in_chans=embed_dims[i], embed_dim=embed_dims[i+1])
+                )
 
         self.network = nn.ModuleList(network)
 
