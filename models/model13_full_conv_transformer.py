@@ -44,8 +44,8 @@ def _cfg(url='', **kwargs):
 
 
 default_cfgs = {
-    'poolformer_s': _cfg(crop_pct=0.9),
-    'poolformer_m': _cfg(crop_pct=0.95),
+    's': _cfg(crop_pct=0.9),
+    'm': _cfg(crop_pct=0.95),
 }
 
 
@@ -71,26 +71,6 @@ class PatchEmbed(nn.Module):
         return x
 
 
-class LayerNormChannel(nn.Module):
-    """
-    LayerNorm only for Channel Dimension.
-    Input: tensor in shape [B, C, H, W]
-    """
-    def __init__(self, num_channels, eps=1e-05):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(num_channels))
-        self.bias = nn.Parameter(torch.zeros(num_channels))
-        self.eps = eps
-
-    def forward(self, x):
-        u = x.mean(1, keepdim=True)
-        s = (x - u).pow(2).mean(1, keepdim=True)
-        x = (x - u) / torch.sqrt(s + self.eps)
-        x = self.weight.unsqueeze(-1).unsqueeze(-1) * x \
-            + self.bias.unsqueeze(-1).unsqueeze(-1)
-        return x
-
-
 class GroupNorm(nn.GroupNorm):
     """
     Group Normalization with 1 group.
@@ -99,19 +79,6 @@ class GroupNorm(nn.GroupNorm):
     def __init__(self, num_channels, **kwargs):
         super().__init__(1, num_channels, **kwargs)
 
-
-class Pooling(nn.Module):
-    """
-    Implementation of pooling for PoolFormer
-    --pool_size: pooling size
-    """
-    def __init__(self, pool_size=3):
-        super().__init__()
-        self.pool = nn.AvgPool2d(
-            pool_size, stride=1, padding=pool_size//2, count_include_pad=False)
-
-    def forward(self, x):
-        return self.pool(x) - x
 
 class Shifting(nn.Module):
     """
@@ -134,6 +101,7 @@ class Shifting(nn.Module):
 
         out[:, g * 4:, :, :] = x[:, g * 4:, :, :]  # no shift
         return out
+
 
 class Mlp(nn.Module):
     """
@@ -420,13 +388,6 @@ class PoolFormer(nn.Module):
 
 @register_model
 def fct_s12_32(pretrained=False, **kwargs):
-    """
-    PoolFormer-S12 model, Params: 12M
-    --layers: [x,x,x,x], numbers of layers for the four stages
-    --embed_dims, --mlp_ratios:
-        embedding dims and mlp ratios for the four stages
-    --downsamples: flags to apply downsampling or not in four blocks
-    """
     layers = [2, 2, 6, 2]
     embed_dims = [64, 128, 320, 512]
     mlp_ratios = [4, 4, 4, 4]
@@ -435,57 +396,7 @@ def fct_s12_32(pretrained=False, **kwargs):
         layers, embed_dims=embed_dims,
         mlp_ratios=mlp_ratios, downsamples=downsamples,
         **kwargs)
-    model.default_cfg = default_cfgs['poolformer_s']
-    return model
-
-
-@register_model
-def fct_s12_32_att(pretrained=False, **kwargs):
-    """
-    PoolFormer-S12 model, Params: 12M
-    --layers: [x,x,x,x], numbers of layers for the four stages
-    --embed_dims, --mlp_ratios:
-        embedding dims and mlp ratios for the four stages
-    --downsamples: flags to apply downsampling or not in four blocks
-    """
-    layers = [4, 4, 12, 4]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    downsamples = [True, True, True, True]
-    model = PoolFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        **kwargs)
-    model.default_cfg = default_cfgs['poolformer_s']
-    return model
-
-
-@register_model
-def fct_s12_64_att(pretrained=False, **kwargs):
-
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    downsamples = [True, True, True, True]
-    model = PoolFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples, n_groups=16,
-        **kwargs)
-    model.default_cfg = default_cfgs['poolformer_s']
-    return model
-
-@register_model
-def fct_s24_64_att(pretrained=False, **kwargs):
-
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    downsamples = [True, True, True, True]
-    model = PoolFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples, n_groups=8,
-        **kwargs)
-    model.default_cfg = default_cfgs['poolformer_s']
+    model.default_cfg = default_cfgs['s']
     return model
 
 
