@@ -28,7 +28,7 @@ class OverlapPatchEmbed(nn.Module):
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
                               padding=(patch_size[0] // 2, patch_size[1] // 2))
         self.norm = GroupNorm(embed_dim)
-        self.apply(self._init_weights)
+        # self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -98,7 +98,7 @@ class TokenMixer(nn.Module):
         if useSpatialAtt:
             self.spatial_att = SpatialAtt(dim=dim)
 
-        self.apply(self._init_weights)
+        # self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -136,7 +136,7 @@ class ChannelMixer(nn.Module):
         self.drop = nn.Dropout(drop)
         if useChannelAtt:
             self.channel_att = ChannelAtt(dim)
-        self.apply(self._init_weights)
+        # self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -178,7 +178,7 @@ class Block(nn.Module):
         self.channel_mixer = ChannelMixer(dim=dim, hidden_dim=mlp_hidden_dim,
                             act_layer=act_layer, drop=drop, useChannelAtt=useChannelAtt)
 
-        self.apply(self._init_weights)
+        # self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -237,7 +237,7 @@ class BaseTransformer(nn.Module):
         # classification head
         self.head = nn.Linear(embed_dims[3], num_classes) if num_classes > 0 else nn.Identity()
 
-        self.apply(self._init_weights)
+        # self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
