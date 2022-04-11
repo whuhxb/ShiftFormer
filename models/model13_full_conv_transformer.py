@@ -134,7 +134,7 @@ class Mlp(nn.Module):
         return x
 
 
-class PoolFormerBlock(nn.Module):
+class BasicBlock(nn.Module):
     """
     Implementation of one PoolFormer block.
     --dim: embedding dim
@@ -194,9 +194,8 @@ def basic_blocks(dim, index, layers,
     """
     blocks = []
     for block_idx in range(layers[index]):
-        block_dpr = drop_path_rate * (
-            block_idx + sum(layers[:index])) / (sum(layers) - 1)
-        blocks.append(PoolFormerBlock(
+        block_dpr = drop_path_rate * ( block_idx + sum(layers[:index])) / (sum(layers) - 1)
+        blocks.append(BasicBlock(
             dim, n_groups=n_groups, mlp_ratio=mlp_ratio,
             act_layer=act_layer, norm_layer=norm_layer,
             drop=drop_rate, drop_path=block_dpr,
@@ -208,23 +207,7 @@ def basic_blocks(dim, index, layers,
     return blocks
 
 
-class PoolFormer(nn.Module):
-    """
-    PoolFormer, the main class of our model
-    --layers: [x,x,x,x], number of blocks for the 4 stages
-    --embed_dims, --mlp_ratios, --pool_size: the embedding dims, mlp ratios and
-        pooling size for the 4 stages
-    --downsamples: flags to apply downsampling or not
-    --norm_layer, --act_layer: define the types of normalization and activation
-    --num_classes: number of classes for the image classification
-    --in_patch_size, --in_stride, --in_pad: specify the patch embedding
-        for the input image
-    --down_patch_size --down_stride --down_pad:
-        specify the downsample (patch embed.)
-    --fork_feat: whether output features of the 4 stages, for dense prediction
-    --init_cfg, --pretrained:
-        for mmdetection and mmsegmentation to load pretrained weights
-    """
+class BaseFormer(nn.Module):
     def __init__(self, layers, embed_dims=None,
                  mlp_ratios=None, downsamples=None,
                  n_groups=12,
@@ -392,7 +375,7 @@ def fct_s12_32(pretrained=False, **kwargs):
     embed_dims = [64, 128, 320, 512]
     mlp_ratios = [4, 4, 4, 4]
     downsamples = [True, True, True, True]
-    model = PoolFormer(
+    model = BaseFormer(
         layers, embed_dims=embed_dims,
         mlp_ratios=mlp_ratios, downsamples=downsamples,
         **kwargs)
