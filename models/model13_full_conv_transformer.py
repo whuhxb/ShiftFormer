@@ -61,7 +61,7 @@ class OverlapPatchEmbed(nn.Module):
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
                               padding=(patch_size[0] // 2, patch_size[1] // 2))
         self.norm = GroupNorm(embed_dim)
-        # self.apply(self._init_weights)
+        self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -84,7 +84,6 @@ class OverlapPatchEmbed(nn.Module):
         return x
 
 
-
 class GroupNorm(nn.GroupNorm):
     """
     Group Normalization with 1 group.
@@ -94,65 +93,11 @@ class GroupNorm(nn.GroupNorm):
         super().__init__(1, num_channels, **kwargs)
 
 
-class Shifting(nn.Module):
-    """
-    Implementation of Shifting for ShiftFormer
-    --n_groups: divide c channel to n-groups
-    """
-    def __init__(self, n_groups=12):
-        super().__init__()
-        self.n_groups=n_groups
-
-    def forward(self, x):
-        B, C, H, W = x.shape
-        g = C // self.n_groups
-        out = torch.zeros_like(x)
-
-        out[:, g * 0:g * 1, :, :-1] = x[:, g * 0:g * 1, :, 1:]  # shift left
-        out[:, g * 1:g * 2, :, 1:] = x[:, g * 1:g * 2, :, :-1]  # shift right
-        out[:, g * 2:g * 3, :-1, :] = x[:, g * 2:g * 3, 1:, :]  # shift up
-        out[:, g * 3:g * 4, 1:, :] = x[:, g * 3:g * 4, :-1, :]  # shift down
-
-        out[:, g * 4:, :, :] = x[:, g * 4:, :, :]  # no shift
-        return out
-
-
-class Mlp(nn.Module):
-    """
-    Implementation of MLP with 1*1 convolutions.
-    Input: tensor with shape [B, C, H, W]
-    """
-    def __init__(self, in_features, hidden_features=None,
-                 out_features=None, act_layer=nn.GELU, drop=0.):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-        self.fc1 = nn.Conv2d(in_features, hidden_features, 1)
-        self.act = act_layer()
-        self.fc2 = nn.Conv2d(hidden_features, out_features, 1)
-        self.drop = nn.Dropout(drop)
-        self.apply(self._init_weights)
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Conv2d):
-            trunc_normal_(m.weight, std=.02)
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
-        return x
-
-
 class SpatialAtt(nn.Module):
     def __init__(self, dim, s_att_ks=7, s_att_r=4):
         super().__init__()
         self.spatial_att = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2),
-                                    # nn.BatchNorm2d(dim),
+                                    nn.BatchNorm2d(dim),
                                     nn.Sigmoid())
 
     def forward(self,x):
@@ -191,11 +136,9 @@ class TokenMixer(nn.Module):
         if useBN:
             self.dw3x3BN = nn.BatchNorm2d(dim)
             self.dw5x5dilatedBN = nn.BatchNorm2d(dim)
-
         if useSpatialAtt:
             self.spatial_att = SpatialAtt(dim=dim)
-
-        # self.apply(self._init_weights)
+        self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -233,7 +176,7 @@ class ChannelMixer(nn.Module):
         self.drop = nn.Dropout(drop)
         if useChannelAtt:
             self.channel_att = ChannelAtt(dim)
-        # self.apply(self._init_weights)
+        self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -262,33 +205,22 @@ class ChannelMixer(nn.Module):
 
 
 class BasicBlock(nn.Module):
-    """
-    Implementation of one PoolFormer block.
-    --dim: embedding dim
-    --pool_size: pooling size
-    --mlp_ratio: mlp expansion ratio
-    --act_layer: activation
-    --norm_layer: normalization
-    --drop: dropout rate
-    --drop path: Stochastic Depth,
-        refer to https://arxiv.org/abs/1603.09382
-    --use_layer_scale, --layer_scale_init_value: LayerScale,
-        refer to https://arxiv.org/abs/2103.17239
-    """
-    def __init__(self, dim, n_groups=12, mlp_ratio=4.,
+    def __init__(self, dim,  mlp_ratio=4.,
                  act_layer=nn.GELU, norm_layer=GroupNorm,
                  drop=0., drop_path=0.,
-                 use_layer_scale=True, layer_scale_init_value=1e-5):
+                 use_layer_scale=True, layer_scale_init_value=1e-5,
+                 useBN=False, useSpatialAtt=False, useChannelAtt=False):
 
         super().__init__()
 
         self.norm1 = norm_layer(dim)
-        self.token_mixer = TokenMixer(dim=dim)
+        self.token_mixer = TokenMixer(dim=dim, act_layer=act_layer,
+                                      useBN=useBN, useSpatialAtt=useSpatialAtt)
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.channel_mixer = ChannelMixer(dim=dim, hidden_dim=mlp_hidden_dim, act_layer=act_layer, drop=drop, useChannelAtt=True)
+        self.channel_mixer = ChannelMixer(dim=dim, hidden_dim=mlp_hidden_dim, act_layer=act_layer,
+                                          drop=drop, useChannelAtt=useChannelAtt)
 
-        # The following two techniques are useful to train deep PoolFormers.
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.use_layer_scale = use_layer_scale
         if use_layer_scale:
@@ -312,10 +244,11 @@ class BasicBlock(nn.Module):
 
 
 def basic_blocks(dim, index, layers,
-                 n_groups=12, mlp_ratio=4.,
+                 mlp_ratio=4.,
                  act_layer=nn.GELU, norm_layer=GroupNorm,
                  drop_rate=.0, drop_path_rate=0.,
-                 use_layer_scale=True, layer_scale_init_value=1e-5):
+                 use_layer_scale=True, layer_scale_init_value=1e-5,
+                 useBN=False, useSpatialAtt=False, useChannelAtt=False):
     """
     generate PoolFormer blocks for a stage
     return: PoolFormer blocks
@@ -324,11 +257,12 @@ def basic_blocks(dim, index, layers,
     for block_idx in range(layers[index]):
         block_dpr = drop_path_rate * ( block_idx + sum(layers[:index])) / (sum(layers) - 1)
         blocks.append(BasicBlock(
-            dim, n_groups=n_groups, mlp_ratio=mlp_ratio,
+            dim, mlp_ratio=mlp_ratio,
             act_layer=act_layer, norm_layer=norm_layer,
             drop=drop_rate, drop_path=block_dpr,
             use_layer_scale=use_layer_scale,
             layer_scale_init_value=layer_scale_init_value,
+            useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt
             ))
     blocks = nn.Sequential(*blocks)
 
@@ -338,16 +272,14 @@ def basic_blocks(dim, index, layers,
 class BaseFormer(nn.Module):
     def __init__(self, layers, embed_dims=None,
                  mlp_ratios=None, downsamples=None,
-                 n_groups=12,
                  norm_layer=GroupNorm, act_layer=nn.GELU,
                  num_classes=1000,
-                 in_patch_size=7, in_stride=4, in_pad=2,
-                 down_patch_size=3, down_stride=2, down_pad=1,
                  drop_rate=0., drop_path_rate=0.,
                  use_layer_scale=True, layer_scale_init_value=1e-5,
                  fork_feat=False,
                  init_cfg=None,
                  pretrained=None,
+                 useBN=False, useSpatialAtt=False, useChannelAtt=False,
                  **kwargs):
 
         super().__init__()
@@ -362,12 +294,13 @@ class BaseFormer(nn.Module):
         network = []
         for i in range(len(layers)):
             stage = basic_blocks(embed_dims[i], i, layers,
-                                 n_groups=n_groups, mlp_ratio=mlp_ratios[i],
+                                 mlp_ratio=mlp_ratios[i],
                                  act_layer=act_layer, norm_layer=norm_layer,
                                  drop_rate=drop_rate,
                                  drop_path_rate=drop_path_rate,
                                  use_layer_scale=use_layer_scale,
-                                 layer_scale_init_value=layer_scale_init_value)
+                                 layer_scale_init_value=layer_scale_init_value,
+                                 useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt)
             network.append(stage)
             if i >= len(layers) - 1:
                 break
@@ -496,10 +429,12 @@ def fct_s12_32(pretrained=False, **kwargs):
     layers = [2, 2, 6, 2]
     embed_dims = [64, 128, 320, 512]
     mlp_ratios = [4, 4, 4, 4]
+    useBN, useSpatialAtt, useChannelAtt = False, False, False
     downsamples = [True, True, True, True]
     model = BaseFormer(
         layers, embed_dims=embed_dims,
         mlp_ratios=mlp_ratios, downsamples=downsamples,
+        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
         **kwargs)
     model.default_cfg = default_cfgs['s']
     return model
