@@ -51,16 +51,22 @@ default_cfgs = {
 }
 
 
-class OverlapPatchEmbed(nn.Module):
-    """ Image to Patch Embedding
+class GroupNorm(nn.GroupNorm):
     """
+    Group Normalization with 1 group.
+    Input: tensor in shape [B, C, H, W]
+    """
+    def __init__(self, num_channels, **kwargs):
+        super().__init__(1, num_channels, **kwargs)
 
+
+class OverlapPatchEmbed(nn.Module):
     def __init__(self, patch_size=7, stride=4, in_chans=3, embed_dim=768):
         super().__init__()
         patch_size = to_2tuple(patch_size)
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
                               padding=(patch_size[0] // 2, patch_size[1] // 2))
-        self.norm = GroupNorm(embed_dim)
+        self.norm = nn.BatchNorm2d(embed_dim)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -84,21 +90,14 @@ class OverlapPatchEmbed(nn.Module):
         return x
 
 
-class GroupNorm(nn.GroupNorm):
-    """
-    Group Normalization with 1 group.
-    Input: tensor in shape [B, C, H, W]
-    """
-    def __init__(self, num_channels, **kwargs):
-        super().__init__(1, num_channels, **kwargs)
-
-
 class SpatialAtt(nn.Module):
     def __init__(self, dim, s_att_ks=7, s_att_r=4):
         super().__init__()
-        self.spatial_att = nn.Sequential(nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2),
-                                    nn.BatchNorm2d(dim),
-                                    nn.Sigmoid())
+        self.spatial_att = nn.Sequential(
+            nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2),
+            nn.BatchNorm2d(dim),
+            nn.Sigmoid()
+        )
 
     def forward(self,x):
         _,_,H,W = x.size()
@@ -249,10 +248,6 @@ def basic_blocks(dim, index, layers,
                  drop_rate=.0, drop_path_rate=0.,
                  use_layer_scale=True, layer_scale_init_value=1e-5,
                  useBN=False, useSpatialAtt=False, useChannelAtt=False):
-    """
-    generate PoolFormer blocks for a stage
-    return: PoolFormer blocks
-    """
     blocks = []
     for block_idx in range(layers[index]):
         block_dpr = drop_path_rate * ( block_idx + sum(layers[:index])) / (sum(layers) - 1)
@@ -263,7 +258,8 @@ def basic_blocks(dim, index, layers,
             use_layer_scale=use_layer_scale,
             layer_scale_init_value=layer_scale_init_value,
             useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt
-            ))
+            )
+        )
     blocks = nn.Sequential(*blocks)
 
     return blocks
