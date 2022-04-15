@@ -441,7 +441,7 @@ def fct_s12_32(pretrained=False, **kwargs):
     mlp_ratios = [4, 4, 4, 4]
     # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
     s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
-    useBN, useSpatialAtt, useChannelAtt = False, False, False
+    useBN, useSpatialAtt, useChannelAtt = True, True, True
     downsamples = [True, True, True, True]
     model = BaseFormer(
         layers, embed_dims=embed_dims,
