@@ -140,7 +140,8 @@ class TokenMixer(nn.Module):
         self.useSpatialAtt = useSpatialAtt
         self.dw3x3 = nn.Conv2d(dim, dim, kernel_size=3, padding=1, stride=1, groups=dim)
         self.fc = nn.Conv2d(dim,dim,kernel_size=1, padding=0, stride=1, groups=1)
-        self.dw5x5dilated = nn.Conv2d(dim, dim, kernel_size=5, padding=4, stride=1, groups=dim, dilation=2)
+        # self.dw5x5dilated = nn.Conv2d(dim, dim, kernel_size=5, padding=4, stride=1, groups=dim, dilation=2)
+        self.dw5x5dilated = nn.Identity()
         if useBN:
             self.dw3x3BN = nn.BatchNorm2d(dim)
             self.dw5x5dilatedBN = nn.BatchNorm2d(dim)
