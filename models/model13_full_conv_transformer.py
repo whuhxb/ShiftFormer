@@ -509,6 +509,24 @@ def fct_s12_64_7118_TTT(pretrained=False, **kwargs):
     return model
 
 
+@register_model
+def fct_s24_64_7118_TTT_8844(pretrained=False, **kwargs):
+    layers = [4, 4, 12, 4]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
+    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 1, 1, 8
+    useBN, useSpatialAtt, useChannelAtt = True, True, True
+    downsamples = [True, True, True, True]
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
+        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
 
 
 if __name__ == '__main__':
