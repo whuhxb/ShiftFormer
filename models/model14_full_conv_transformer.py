@@ -140,8 +140,7 @@ class TokenMixer(nn.Module):
         self.useSpatialAtt = useSpatialAtt
         self.dw3x3 = nn.Conv2d(dim, dim, kernel_size=3, padding=1, stride=1, groups=dim)
         self.fc = nn.Conv2d(dim,dim,kernel_size=1, padding=0, stride=1, groups=1)
-        # self.dw5x5dilated = nn.Conv2d(dim, dim, kernel_size=5, padding=4, stride=1, groups=dim, dilation=2)
-        self.dw5x5dilated = nn.Conv2d(dim, dim, kernel_size=5, padding=2, stride=1, groups=dim, dilation=1)
+        self.dw5x5dilated = nn.Conv2d(dim, dim, kernel_size=5, padding=4, stride=1, groups=dim, dilation=2)
         # self.dw5x5dilated = nn.Identity()
         if useBN:
             self.dw3x3BN = nn.BatchNorm2d(dim)
@@ -181,7 +180,8 @@ class ChannelMixer(nn.Module):
         self.useChannelAtt = useChannelAtt
         self.act = act_layer()
         self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
-        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1, bias=True, groups=hidden_dim)
+        # self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1, bias=True, groups=hidden_dim)
+        self.dwconv = nn.Identity()
         self.fc2 = nn.Conv2d(hidden_dim, dim, 1)
         self.drop = nn.Dropout(drop)
         if useChannelAtt:
