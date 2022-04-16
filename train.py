@@ -500,6 +500,7 @@ def main():
         lr_scheduler.step(start_epoch)
 
     if args.local_rank == 0:
+        _logger.info('Github ID: {}'.format(get_git_commit_id()))
         _logger.info('Scheduled epochs: {}'.format(num_epochs))
 
     # create the train and eval datasets
