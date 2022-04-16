@@ -301,6 +301,18 @@ parser.add_argument('--torchscript', dest='torchscript', action='store_true',
                     help='convert model torchscript for inference')
 parser.add_argument('--log-wandb', action='store_true', default=False,
                     help='log training and validation metrics to wandb')
+parser.add_argument('--git-id', default='None', type=str, metavar='GITHUB_ID',
+                    help='Save the github ID')
+
+
+def get_git_commit_id():
+    try:
+        import subprocess
+        cmd_out = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+        return cmd_out
+    except:
+        # indicating no git found.
+        return "0000000"
 
 
 def _parse_args():
@@ -314,7 +326,7 @@ def _parse_args():
     # The main arg parser parses the rest of the args, the usual
     # defaults will have been overridden if config file specified.
     args = parser.parse_args(remaining)
-
+    args.git_id = get_git_commit_id()
     # Cache the args as a text string to save them in the output dir later
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
     return args, args_text
