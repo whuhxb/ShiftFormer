@@ -1,6 +1,6 @@
 
 """
-Based on model1, change to shuffle operation, 1 token stride
+Based on model1, change to shuffle operation, 1 token stride 73.87799993408203
 Based on PoolFormer, change to static shift.
 """
 import os

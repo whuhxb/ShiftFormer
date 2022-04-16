@@ -97,8 +97,20 @@ ResMLP= {
     "speed": [],
     "mode": ["S12", "S24", "B24"],
     "marker": "*",
+    # "marker": "$\circledast$",
     "color": "gold",
     "meta": "arXiv 2021"
+}
+
+FCT= {
+    "param": [13.8],
+    "mac": [2.2],
+    "acc": [80.2],
+    "speed": [],
+    "mode": ["S12", "S24", "B24"],
+    "marker": "$\circledast$",
+    "color": "deeppink",
+    "meta": "ours"
 }
 
 def var_name(var, all_var=locals()):
@@ -114,7 +126,7 @@ line_style="-."   #   -.   --   -
 models = [ResNet, DeiT, SwinT, PVT, T2T, ASMLP, ConvNeXt, PoolFormer, ResMLP]
 
 
-def plot_param_acc(models = [ResNet, DeiT, SwinT, PVT, T2T, ConvNeXt, PoolFormer, ResMLP]):
+def plot_param_acc(models = [ResNet, DeiT, SwinT, PVT, T2T, ConvNeXt, PoolFormer, ResMLP, FCT]):
     fig, ax = plt.subplots(figsize=figure_size)
     plt.rcParams["figure.figsize"] = (20,3)
     legend_list= []
@@ -140,7 +152,7 @@ def plot_param_acc(models = [ResNet, DeiT, SwinT, PVT, T2T, ConvNeXt, PoolFormer
     plt.close()
 
 
-def plot_mac_acc(models = [ResNet, DeiT, SwinT, PVT, T2T, ConvNeXt, PoolFormer, ResMLP]):
+def plot_mac_acc(models = [ResNet, DeiT, SwinT, PVT, T2T, ConvNeXt, PoolFormer, ResMLP, FCT]):
     fig, ax = plt.subplots(figsize=figure_size)
     plt.rcParams["figure.figsize"] = (20,3)
     legend_list= []
