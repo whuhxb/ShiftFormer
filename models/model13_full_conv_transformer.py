@@ -490,6 +490,27 @@ def fct_s12_64_7478_TTF(pretrained=False, **kwargs):
     return model
 
 
+
+@register_model
+def fct_s12_64_7478_FFF(pretrained=False, **kwargs):
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
+    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
+    useBN, useSpatialAtt, useChannelAtt = False, False, False
+    downsamples = [True, True, True, True]
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
+        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
+
 @register_model
 def fct_s12_64_7118_TTT(pretrained=False, **kwargs):
     layers = [2, 2, 6, 2]
@@ -531,7 +552,7 @@ def fct_s24_64_7118_TTT_8844(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fct_s12_32()
+    model = fct_s12_64_7478_FFF()
     out = model(input)
     print(model)
     print(out.shape)
