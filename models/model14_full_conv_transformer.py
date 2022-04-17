@@ -180,8 +180,7 @@ class ChannelMixer(nn.Module):
         self.useChannelAtt = useChannelAtt
         self.act = act_layer()
         self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
-        # self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1, bias=True, groups=hidden_dim)
-        self.dwconv = nn.Identity()
+        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1, bias=True, groups=hidden_dim)
         self.fc2 = nn.Conv2d(hidden_dim, dim, 1)
         self.drop = nn.Dropout(drop)
         if useChannelAtt:
