@@ -20,7 +20,7 @@ try:
     print("Using DepthWiseConv2dImplicitGEMM for DW-Conv")
     class DWConv2D(DepthWiseConv2dImplicitGEMM):
         def __init__(self, in_channels, kernel_size, bias=True):
-            super().__init__(1, in_channels, kernel_size, bias)
+            super().__init__( in_channels, kernel_size, bias)
 except:
     print("Using Pytorch  for DW-Conv")
     class DWConv2D(nn.Conv2d):
