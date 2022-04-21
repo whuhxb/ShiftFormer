@@ -6,6 +6,7 @@ from .model1_static_shift import model1_static_shiftformer_s12, model1_static_sh
 from .model2_static_shift import model2_static_shiftformer_s12
 from .model3_static_shift import model3_static_shiftformer_s12
 from .model4_static_shift import model4_static_shiftformer_s12
+from .model4_1_static_shift import model4_1_static_shiftformer_s12
 from .model5_static_shift import model5_static_shiftformer_s12
 from .model6_static_shift import model6_static_shiftformer_s12
 from .van import van_small
