@@ -437,63 +437,6 @@ class BaseFormer(nn.Module):
 
 
 @register_model
-def fct14_s12_64_7478_TTT(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
-    useBN, useSpatialAtt, useChannelAtt = True, True, True
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-@register_model
-def fct14_s12_64_7478_TFT(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
-    useBN, useSpatialAtt, useChannelAtt = True, False, True
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-@register_model
-def fct14_s12_64_7478_TTF(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
-    useBN, useSpatialAtt, useChannelAtt = True, True, False
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-
-@register_model
 def fct14_s12_64_7478_FFF(pretrained=False, **kwargs):
     layers = [2, 2, 6, 2]
     embed_dims = [64, 128, 320, 512]
@@ -501,45 +444,6 @@ def fct14_s12_64_7478_FFF(pretrained=False, **kwargs):
     # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
     s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
     useBN, useSpatialAtt, useChannelAtt = False, False, False
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-
-@register_model
-def fct14_s12_64_7118_TTT(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 1, 1, 8
-    useBN, useSpatialAtt, useChannelAtt = True, True, True
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-@register_model
-def fct14_s24_64_7118_TTT_8844(pretrained=False, **kwargs):
-    layers = [4, 4, 12, 4]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [8, 8, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 1, 1, 8
-    useBN, useSpatialAtt, useChannelAtt = True, True, True
     downsamples = [True, True, True, True]
     model = BaseFormer(
         layers, embed_dims=embed_dims,

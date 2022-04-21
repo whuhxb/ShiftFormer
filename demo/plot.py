@@ -103,9 +103,9 @@ ResMLP= {
 }
 
 FCT= {
-    "param": [13.8],
-    "mac": [2.2],
-    "acc": [80.2],
+    "param": [13.8, 24.7],
+    "mac": [2.2, 4.6],
+    "acc": [80.2, 82.4],
     "speed": [],
     "mode": ["S12", "S24", "B24"],
     "marker": "$\circledast$",
