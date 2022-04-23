@@ -67,8 +67,12 @@ class OverlapPatchEmbed(nn.Module):
         patch_size = to_2tuple(patch_size)
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=stride,
                               padding=(patch_size[0] // 2, patch_size[1] // 2))
-        self.norm = GroupNorm(embed_dim)
         self.norm_first = norm_first
+        if self.norm_first:
+            self.norm = GroupNorm(in_chans)
+        else:
+            self.norm = GroupNorm(embed_dim)
+
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
