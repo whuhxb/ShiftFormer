@@ -22,3 +22,9 @@ from .model13_full_conv_transformer import fct_s12_64_7478_TTT, fct_s12_64_7478_
 from .model14_full_conv_transformer import fct14_s12_64_7478_FFF
 from .conv_pd_former import conv_pd_s12_pda, conv_pd_s12_pdb
 from .van import van_tiny
+
+from .fct_shift_CDWshift import fct_s12_64_7118_TTT_CDWshift
+from .fct_shift_SDWshift import fct_s12_64_7118_TTT_SDWshift
+from .fct_shift_2DWshift import fct_s12_64_7118_TTT_2DWshift
+from .fct_channel_conv import   fct_s12_64_7118_TTT_ChannelConv
+from .fct_normpatch import      fct_s12_64_7118_TTT_normpatch
