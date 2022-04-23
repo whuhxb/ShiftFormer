@@ -1,6 +1,6 @@
 
 """
-Based on model13_full_conv_transformer, add a channel conv module
+Based on model13_full_conv_transformer, change SE-channel-attention to ECANet
 Based on PoolFormer, change to static shift.
 """
 import os
@@ -14,6 +14,7 @@ from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.layers import DropPath, trunc_normal_
 from timm.models.registry import register_model
 from timm.models.layers.helpers import to_2tuple
+from einops.layers.torch import Rearrange, Reduce
 
 
 try:
@@ -113,14 +114,15 @@ class SpatialAtt(nn.Module):
 class ChannelAtt(nn.Module):
     def __init__(self, dim, c_att_ks=7, c_att_r=8):
         super().__init__()
+        assert c_att_ks==1
         self.c_att_ks=c_att_ks
         self.hidden_dim=max(8, dim//c_att_r)
         self.channel_att = nn.Sequential(
             nn.AdaptiveAvgPool2d(c_att_ks),
-            nn.Conv2d(dim, self.hidden_dim, 1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(self.hidden_dim, dim, 1),
-            nn.Sigmoid()
+            Rearrange('b d h w -> b (h w) d'),
+            nn.Conv1d(1, 1, 3, padding=1),
+            nn.Sigmoid(),
+            Rearrange('b (h w) d -> b d h w', h=1, w=1),
         )
 
     def forward(self,x):
@@ -212,24 +214,6 @@ class ChannelMixer(nn.Module):
         return x
 
 
-class ChannelConv(nn.Module):
-    def __init__(self, dim, act_layer=nn.GELU):
-        super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.channelConv1 = nn.Conv1d(1, 1, kernel_size=3, padding=1)
-        self.channelConv2 = nn.Conv1d(1, 1, kernel_size=5, padding=2)
-        self.act = act_layer()
-
-    def forward(self, x):
-        x = self.avg_pool(x)
-        x = self.channelConv1(x.squeeze(-1).transpose(-1, -2))
-        x = self.act(x)
-        x = self.channelConv2(x)
-        x = x.transpose(-1, -2).unsqueeze(-1)
-        return x
-
-
-
 class BasicBlock(nn.Module):
     def __init__(self, dim,  mlp_ratio=4.,
                  act_layer=nn.GELU, norm_layer=GroupNorm,
@@ -245,9 +229,6 @@ class BasicBlock(nn.Module):
                                       s_att_ks=s_att_ks, s_att_r=s_att_r,
                                       useBN=useBN, useSpatialAtt=useSpatialAtt)
         self.norm2 = norm_layer(dim)
-        self.channel_conv = ChannelConv(dim=dim, act_layer=act_layer)
-
-        self.norm3 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.channel_mixer = ChannelMixer(dim=dim, hidden_dim=mlp_hidden_dim, act_layer=act_layer,
                                           drop=drop, c_att_ks=c_att_ks, c_att_r=c_att_r, useChannelAtt=useChannelAtt)
@@ -259,8 +240,6 @@ class BasicBlock(nn.Module):
                 layer_scale_init_value * torch.ones((dim)), requires_grad=True)
             self.layer_scale_2 = nn.Parameter(
                 layer_scale_init_value * torch.ones((dim)), requires_grad=True)
-            self.layer_scale_3 = nn.Parameter(
-                layer_scale_init_value * torch.ones((dim)), requires_grad=True)
 
     def forward(self, x):
         if self.use_layer_scale:
@@ -269,14 +248,10 @@ class BasicBlock(nn.Module):
                 * self.token_mixer(self.norm1(x)))
             x = x + self.drop_path(
                 self.layer_scale_2.unsqueeze(-1).unsqueeze(-1)
-                * self.channel_conv(self.norm2(x)))
-            x = x + self.drop_path(
-                self.layer_scale_3.unsqueeze(-1).unsqueeze(-1)
-                * self.channel_mixer(self.norm3(x)))
+                * self.channel_mixer(self.norm2(x)))
         else:
             x = x + self.drop_path(self.token_mixer(self.norm1(x)))
-            x = x + self.drop_path(self.channel_conv(self.norm2(x)))
-            x = x + self.drop_path(self.channel_mixer(self.norm3(x)))
+            x = x + self.drop_path(self.channel_mixer(self.norm2(x)))
         return x
 
 
@@ -461,9 +436,8 @@ class BaseFormer(nn.Module):
         # for image classification
         return cls_out
 
-
 @register_model
-def fct_s12_64_7118_TTT_ChannelConv(pretrained=False, **kwargs):
+def fct_s12_64_7118_TTT_eca(pretrained=False, **kwargs):
     layers = [2, 2, 6, 2]
     embed_dims = [64, 128, 320, 512]
     mlp_ratios = [4, 4, 4, 4]
@@ -481,9 +455,10 @@ def fct_s12_64_7118_TTT_ChannelConv(pretrained=False, **kwargs):
     return model
 
 
+
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fct_s12_64_7118_TTT_ChannelConv()
+    model = fct_s12_64_7118_TTT_eca()
     out = model(input)
     print(model)
     print(out.shape)

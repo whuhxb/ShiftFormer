@@ -28,3 +28,4 @@ from .fct_shift_SDWshift import fct_s12_64_7118_TTT_SDWshift
 from .fct_shift_2DWshift import fct_s12_64_7118_TTT_2DWshift
 from .fct_channel_conv import   fct_s12_64_7118_TTT_ChannelConv
 from .fct_normpatch import      fct_s12_64_7118_TTT_normpatch
+from .fct_channel_att_eca import fct_s12_64_7118_TTT_eca
