@@ -31,3 +31,4 @@ from .fct_normpatch import      fct_s12_64_7118_TTT_normpatch
 from .fct_channel_att_eca import fct_s12_64_7118_TTT_eca
 from .fct_remove_cdwconv import fct_s12_64_7118_TTT_remove_cdwconv
 from .fct_lk_toekn import fct_s12_64_7118_TTT_lk_token
+from .fct_remove_sigmoid import fct_s12_64_7118_TTT_remove_sigmoid
