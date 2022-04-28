@@ -93,15 +93,16 @@ class OverlapPatchEmbed(nn.Module):
 class SpatialAtt(nn.Module):
     def __init__(self, dim, s_att_ks=7, s_att_r=4):
         super().__init__()
+        self.act = nn.GELU()
         self.s_att_r=s_att_r
         self.spatial_att = nn.Sequential(
-            nn.GELU(),
-            nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2),
+            nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2)
             # nn.BatchNorm2d(dim),
             # nn.Sigmoid()
         )
 
     def forward(self,x):
+        x= self.act(x)
         if self.s_att_r==1:
             return x * self.spatial_att(x)
         else:
