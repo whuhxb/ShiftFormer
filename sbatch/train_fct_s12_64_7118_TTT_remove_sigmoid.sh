@@ -11,4 +11,4 @@
 
 source activate timm
 cd /scratch/ma.xu1/ShiftFormer
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fct_s12_64_7118_TTT_remove_sigmoid -b 128 --lr 1e-3 --drop-path 0.1 
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train2.sh 8 /dev/shm/imagenet/ --model fct_s12_64_7118_TTT_remove_sigmoid -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
