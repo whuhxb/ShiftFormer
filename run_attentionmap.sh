@@ -3,7 +3,7 @@ do
     for Model in "deit_base_patch16_224" "vit_large_patch16_224" "vit_base_patch16_224"
     do
     #    for Q in 23 83 143
-        for Q in 98
+        for Q in 23 83 98 143
         do
             for L in 0 6 11
             do
