@@ -18,7 +18,7 @@ from .model10_static_shift import model10_static_shiftformer_s12, model10_static
 from .model11_static_shift import model11_s12
 from .model12_static_shift import model12_s12
 from .model13_full_conv_transformer import fct_s12_64_7478_TTT, fct_s12_64_7478_TFT, fct_s12_64_7118_TTT, fct_s12_64_7478_TTF, \
-    fct_s24_64_7118_TTT_8844, fct_s12_64_7478_FFF, fct_s12_64_7418_TFT
+    fct_s24_64_7118_TTT_8844, fct_s12_64_7478_FFF, fct_s12_64_7418_TFT, fct_s12_64_7438_TTT
 from .model14_full_conv_transformer import fct14_s12_64_7478_FFF
 from .conv_pd_former import conv_pd_s12_pda, conv_pd_s12_pdb
 # from .van import van_tiny
