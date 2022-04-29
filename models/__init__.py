@@ -21,7 +21,7 @@ from .model13_full_conv_transformer import fct_s12_64_7478_TTT, fct_s12_64_7478_
     fct_s24_64_7118_TTT_8844, fct_s12_64_7478_FFF, fct_s12_64_7418_TFT
 from .model14_full_conv_transformer import fct14_s12_64_7478_FFF
 from .conv_pd_former import conv_pd_s12_pda, conv_pd_s12_pdb
-from .van import van_tiny
+# from .van import van_tiny
 
 from .fct_shift_CDWshift import fct_s12_64_7118_TTT_CDWshift
 from .fct_shift_SDWshift import fct_s12_64_7118_TTT_SDWshift
@@ -32,3 +32,5 @@ from .fct_channel_att_eca import fct_s12_64_7118_TTT_eca
 from .fct_remove_cdwconv import fct_s12_64_7118_TTT_remove_cdwconv
 from .fct_lk_toekn import fct_s12_64_7118_TTT_lk_token
 from .fct_remove_sigmoid import fct_s12_64_7118_TTT_remove_sigmoid
+
+from .fcvt_v2_base import van_small
