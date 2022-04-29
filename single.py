@@ -38,8 +38,8 @@ parser.add_argument('--query', default=143, type=int,
 
 args = parser.parse_args()
 assert args.model in timm.list_models(), "Please use a timm pre-trined model, see timm.list_models()"
-assert args.model in ["deit_base_patch16_224"], "Currently, only support Vision Transformers patch 16, size 224"
-
+assert args.model in ["deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224"], "Currently, only support Vision Transformers patch 16, size 224"
+# vit_base_patch16_224  double-check.
 
 # Preprocessing
 def _preprocess(image_path):
@@ -108,8 +108,12 @@ def main():
     mask[0, 0, row, col] = 1.0
     mask = F.interpolate(mask,(224,224))
     mask = mask.squeeze(dim=0).permute(1,2,0)
-    show_cam_on_image(args.image, mask, f"images/out/{image_name}_Q{args.query}.png",  is_query=True)
-    print(f"Query image is saved to: images/out/{image_name}_Q{args.query}.png")
+    try:
+        os.makedirs(f"images/out/{args.model}/")
+    except:
+        pass
+    show_cam_on_image(args.image, mask, f"images/out/{args.model}/{image_name}_Q{args.query}.png",  is_query=True)
+    print(f"Query image is saved to: images/out/{args.model}/{image_name}_Q{args.query}.png")
     # cv2.imwrite("images/out/save.png", raw_image)
 
 
@@ -120,8 +124,8 @@ def main():
     mask = F.interpolate(mask,(224,224))
     mask = mask.squeeze(dim=0).permute(1,2,0)
     mask = (mask -mask.min())/(mask.max()-mask.min()) # normalize to 0-1
-    show_cam_on_image(args.image, mask, f"images/out/{image_name}_Q{args.query}_L{args.layer}_H{args.head}.png",  is_query=False)
-    print(f"Atten image is saved to: images/out/{image_name}_Q{args.query}_L{args.layer}_H{args.head}.png")
+    show_cam_on_image(args.image, mask, f"images/out/{args.model}/{image_name}_Q{args.query}_L{args.layer}_H{args.head}.png",  is_query=False)
+    print(f"Atten image is saved to: images/out/{args.model}/{image_name}_Q{args.query}_L{args.layer}_H{args.head}.png")
     # print(f"attention shape is {attention.shape}")
 
 
