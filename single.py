@@ -38,7 +38,7 @@ parser.add_argument('--query', default=143, type=int,
 
 args = parser.parse_args()
 assert args.model in timm.list_models(), "Please use a timm pre-trined model, see timm.list_models()"
-assert args.model in ["deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224"], "Currently, only support Vision Transformers patch 16, size 224"
+assert args.model in ["deit_base_distilled_patch16_224", "deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224"], "Currently, only support Vision Transformers patch 16, size 224"
 # vit_base_patch16_224  double-check.
 
 # Preprocessing
