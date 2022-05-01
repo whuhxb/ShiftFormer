@@ -31,6 +31,19 @@ except ImportError:
     # print("If for detection, please install mmdetection first")
     has_mmdet = False
 
+try:
+    from depthwise_conv2d_implicit_gemm import DepthWiseConv2dImplicitGEMM
+    print("Using DepthWiseConv2dImplicitGEMM for DW-Conv")
+    class DWConv2D(DepthWiseConv2dImplicitGEMM):
+        def __init__(self, in_channels, kernel_size, bias=True):
+            super().__init__( in_channels, kernel_size, bias)
+except:
+    print("Using Pytorch  for DW-Conv")
+    class DWConv2D(nn.Conv2d):
+        def __init__(self, in_channels, kernel_size, bias=True):
+            super().__init__(1, in_channels, in_channels, kernel_size,stride=1,
+                             padding= kernel_size//2,  groups=in_channels, bias=bias)
+
 params= {
     "spatial_mixer":{
         "mix_size_1": 5,
@@ -164,11 +177,8 @@ class TokenMixer(nn.Module):
         self.useSpatialAtt = params["spatial_mixer"]["useSpatialAtt"]
         self.weighted_gc = params["spatial_mixer"]["weighted_gc"]
         self.gc1 = GlobalContext(dim)
-        # self.dw1 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_1"],
-        #                      padding=params["spatial_mixer"]["mix_size_1"]//2, stride=1, groups=dim)
         self.dw1 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_1"],
-                                padding=(params["spatial_mixer"]["mix_size_1"]*2-1)//2,
-                                stride=1, groups=dim, dilation=2)
+                             padding=params["spatial_mixer"]["mix_size_1"]//2, stride=1, groups=dim)
         self.fc1 = nn.Conv2d(dim, dim, kernel_size=1, padding=0, stride=1, groups=1)
 
         if params["spatial_mixer"]["useSecondTokenMix"]:
@@ -476,7 +486,7 @@ class BaseFormer(nn.Module):
 def fcvt_s12_64(pretrained=False, **kwargs):
 
     fcvt_params = params.copy()
-    fcvt_params["spatial_mixer"]["mix_size_1"] = 5
+    fcvt_params["spatial_mixer"]["mix_size_1"] = 9
     fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
     fcvt_params["channel_mixer"]["useDWconv"] = False
     fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
