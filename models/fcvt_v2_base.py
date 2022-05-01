@@ -1,13 +1,11 @@
 
-"""
-Based on PoolFormer, change to static shift.
-"""
 import os
 import math
 import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import einsum
 
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.layers import DropPath, trunc_normal_
@@ -33,7 +31,27 @@ except ImportError:
     # print("If for detection, please install mmdetection first")
     has_mmdet = False
 
-
+params= {
+    "spatial_mixer":{
+        "mix_size_1": 5,
+        "useSecondTokenMix": True,
+        "mix_size_2": 5,
+        "useSpatialAtt": True,
+        "weighted_gc": True
+    },
+    "channel_mixer":{
+        "useChannelAtt": True,
+        "useDWconv":True,
+        "DWconv_size":3
+    },
+    "spatial_att":{
+        "kernel_size": 3
+    },
+    "channel_att":{
+        "size_1": 3,
+        "size_2": 5,
+    }
+}
 def _cfg(url='', **kwargs):
     return {
         'url': url,
@@ -91,60 +109,74 @@ class OverlapPatchEmbed(nn.Module):
 
 
 class SpatialAtt(nn.Module):
-    def __init__(self, dim, s_att_ks=7, s_att_r=4):
+    def __init__(self, dim, act_layer=nn.GELU, params = params):
         super().__init__()
-        self.s_att_r=s_att_r
         self.spatial_att = nn.Sequential(
-            nn.Conv2d(dim, dim, kernel_size=s_att_ks, stride=s_att_r, groups=dim, padding=s_att_ks//2),
-            nn.BatchNorm2d(dim),
+            nn.Conv2d(dim, dim, kernel_size=params["spatial_att"]["kernel_size"],
+                      stride=1, groups=dim, padding=params["spatial_att"]["kernel_size"]//2),
+            act_layer(),
+            nn.Conv2d(dim, dim,1),
             nn.Sigmoid()
         )
 
     def forward(self,x):
-        if self.s_att_r==1:
-            return x * self.spatial_att(x)
-        else:
-            _,_,H,W = x.size()
-            # print(f"spatial att shape: {x.size()}")
-            return x * F.interpolate(self.spatial_att(x), (H,W))
+        return x * self.spatial_att(x)
 
 
 class ChannelAtt(nn.Module):
-    def __init__(self, dim, c_att_ks=7, c_att_r=8):
+    def __init__(self, act_layer=nn.GELU, params=params):
         super().__init__()
-        self.c_att_ks=c_att_ks
-        self.hidden_dim=max(8, dim//c_att_r)
-        self.channel_att = nn.Sequential(
-            nn.AdaptiveAvgPool2d(c_att_ks),
-            nn.Conv2d(dim, self.hidden_dim, 1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(self.hidden_dim, dim, 1),
-            nn.Sigmoid()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        size_1 =params["channel_att"]["size_1"]
+        size_2 =params["channel_att"]["size_2"]
+        self.channelConv1 = nn.Conv1d(1, 1, size_1, padding=size_1//2)
+        self.channelConv2 = nn.Conv1d(1, 1, kernel_size=size_2, padding=size_2//2)
+        self.act = act_layer()
+
+    def forward(self, x):
+        res = x.clone()
+        x = self.avg_pool(x)
+        x = self.channelConv1(x.squeeze(-1).transpose(-1, -2))
+        x = self.act(x)
+        x = self.channelConv2(x)
+        x = x.transpose(-1, -2).unsqueeze(-1)
+
+        return res + x
+
+
+class GlobalContext(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.global_context = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+
+            nn.Conv2d(dim, dim, 1)
         )
 
     def forward(self,x):
-        if self.c_att_ks==1:
-            return x * self.channel_att(x)
-        else:
-            _,_,H,W = x.size()
-            # print(f"channel att shape: {x.size()}")
-            return x * F.interpolate(self.channel_att(x), (H,W))
+        return self.global_context(x)  # [b,c,1,1]
 
 
 class TokenMixer(nn.Module):
-    def __init__(self, dim, act_layer=nn.GELU, s_att_ks=7, s_att_r=4, useBN=True, useSpatialAtt=True):
+    def __init__(self, dim, act_layer=nn.GELU, params=params):
         super().__init__()
         self.act = act_layer()
-        self.useBN = useBN
-        self.useSpatialAtt = useSpatialAtt
-        self.dw3x3 = nn.Conv2d(dim, dim, kernel_size=3, padding=1, stride=1, groups=dim)
-        self.fc = nn.Conv2d(dim,dim,kernel_size=1, padding=0, stride=1, groups=1)
-        self.dw5x5dilated = nn.Conv2d(dim, dim, kernel_size=5, padding=4, stride=1, groups=dim, dilation=2)
-        if useBN:
-            self.dw3x3BN = nn.BatchNorm2d(dim)
-            self.dw5x5dilatedBN = nn.BatchNorm2d(dim)
-        if useSpatialAtt:
-            self.spatial_att = SpatialAtt(dim=dim, s_att_ks=s_att_ks, s_att_r=s_att_r)
+        self.useSpatialAtt = params["spatial_mixer"]["useSpatialAtt"]
+        self.weighted_gc = params["spatial_mixer"]["weighted_gc"]
+        self.gc1 = GlobalContext(dim)
+        self.dw1 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_1"],
+                             padding=params["spatial_mixer"]["mix_size_1"]//2, stride=1, groups=dim)
+        self.fc1 = nn.Conv2d(dim, dim, kernel_size=1, padding=0, stride=1, groups=1)
+
+        if params["spatial_mixer"]["useSecondTokenMix"]:
+            self.gc2 = GlobalContext(dim)
+            self.dw2 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_2"],
+                                padding=(params["spatial_mixer"]["mix_size_2"]*2-1)//2,
+                                stride=1, groups=dim, dilation=2)
+            self.fc2 = nn.Conv2d(dim, dim, kernel_size=1, padding=0, stride=1, groups=1)
+
+        if params["spatial_mixer"]["useSpatialAtt"]:
+            self.spatial_att = SpatialAtt(dim=dim, act_layer=act_layer, params=params)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -163,26 +195,42 @@ class TokenMixer(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        x = self.act(self.dw3x3BN(self.dw3x3(x))) if self.useBN else self.act(self.dw3x3(x))
-        x = self.act((self.fc(x)))
-        x = self.act(self.dw5x5dilatedBN(self.dw5x5dilated(x))) if self.useBN else self.act(self.dw5x5dilated(x))
+        gc1 = self.gc1(x)
+        # TODO: consider the weighted_gc
+        if self.weighted_gc:
+
+            x +=gc1
+        else:
+            x +=gc1
+        x = self.act(self.fc1(self.dw1(x)))
+
+        if hasattr(self, "gc2"):
+            gc2 = self.gc2(x)
+            # TODO: consider the weighted_gc
+            if self.weighted_gc:
+                x +=gc2
+            else:
+                x +=gc2
+            x = self.act(self.fc2(self.dw2(x)))
         if self.useSpatialAtt:
             x = self.spatial_att(x)
         return x
 
 
 class ChannelMixer(nn.Module):
-    def __init__(self, dim, hidden_dim=None, act_layer=nn.GELU, drop=0., c_att_ks=7, c_att_r=8, useChannelAtt=True):
+    def __init__(self, dim, hidden_dim=None, act_layer=nn.GELU, drop=0., params=params):
         super().__init__()
         hidden_dim = hidden_dim or dim
-        self.useChannelAtt = useChannelAtt
+        self.useChannelAtt = params["channel_mixer"]["useChannelAtt"]
         self.act = act_layer()
         self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
-        self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1, bias=True, groups=hidden_dim)
+        if params["channel_mixer"]["useDWconv"]:
+            self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, params["channel_mixer"]["DWconv_size"],
+                            1, params["channel_mixer"]["DWconv_size"]//2, bias=True, groups=hidden_dim)
         self.fc2 = nn.Conv2d(hidden_dim, dim, 1)
         self.drop = nn.Dropout(drop)
-        if useChannelAtt:
-            self.channel_att = ChannelAtt(dim, c_att_ks=c_att_ks, c_att_r=c_att_r)
+        if self.useChannelAtt:
+            self.channel_att = ChannelAtt(act_layer=act_layer, params=params)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -215,37 +263,25 @@ class BasicBlock(nn.Module):
     def __init__(self, dim,  mlp_ratio=4.,
                  act_layer=nn.GELU, norm_layer=GroupNorm,
                  drop=0., drop_path=0.,
-                 use_layer_scale=True, layer_scale_init_value=1e-5,
-                 s_att_ks=7, s_att_r=4, c_att_ks=7, c_att_r=8,
-                 useBN=False, useSpatialAtt=False, useChannelAtt=False):
+                 use_layer_scale=True, layer_scale_init_value=1e-4,
+                 params = params):
 
         super().__init__()
-
         self.norm1 = norm_layer(dim)
-        self.token_mixer = TokenMixer(dim=dim, act_layer=act_layer,
-                                      s_att_ks=s_att_ks, s_att_r=s_att_r,
-                                      useBN=useBN, useSpatialAtt=useSpatialAtt)
+        self.token_mixer = TokenMixer(dim=dim, act_layer=act_layer, params=params)
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.channel_mixer = ChannelMixer(dim=dim, hidden_dim=mlp_hidden_dim, act_layer=act_layer,
-                                          drop=drop, c_att_ks=c_att_ks, c_att_r=c_att_r, useChannelAtt=useChannelAtt)
-
+        self.channel_mixer = ChannelMixer(dim=dim, hidden_dim=mlp_hidden_dim, act_layer=act_layer, drop=drop, params=params)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.use_layer_scale = use_layer_scale
         if use_layer_scale:
-            self.layer_scale_1 = nn.Parameter(
-                layer_scale_init_value * torch.ones((dim)), requires_grad=True)
-            self.layer_scale_2 = nn.Parameter(
-                layer_scale_init_value * torch.ones((dim)), requires_grad=True)
+            self.layer_scale_1 = nn.Parameter(layer_scale_init_value * torch.ones((dim)), requires_grad=True)
+            self.layer_scale_2 = nn.Parameter(layer_scale_init_value * torch.ones((dim)), requires_grad=True)
 
     def forward(self, x):
         if self.use_layer_scale:
-            x = x + self.drop_path(
-                self.layer_scale_1.unsqueeze(-1).unsqueeze(-1)
-                * self.token_mixer(self.norm1(x)))
-            x = x + self.drop_path(
-                self.layer_scale_2.unsqueeze(-1).unsqueeze(-1)
-                * self.channel_mixer(self.norm2(x)))
+            x = x + self.drop_path(self.layer_scale_1.unsqueeze(-1).unsqueeze(-1) * self.token_mixer(self.norm1(x)))
+            x = x + self.drop_path(self.layer_scale_2.unsqueeze(-1).unsqueeze(-1) * self.channel_mixer(self.norm2(x)))
         else:
             x = x + self.drop_path(self.token_mixer(self.norm1(x)))
             x = x + self.drop_path(self.channel_mixer(self.norm2(x)))
@@ -257,8 +293,7 @@ def basic_blocks(dim, index, layers,
                  act_layer=nn.GELU, norm_layer=GroupNorm,
                  drop_rate=.0, drop_path_rate=0.,
                  use_layer_scale=True, layer_scale_init_value=1e-5,
-                 s_att_ks=7, s_att_r=4, c_att_ks=7, c_att_r=8,
-                 useBN=False, useSpatialAtt=False, useChannelAtt=False):
+                 params = params):
     blocks = []
     for block_idx in range(layers[index]):
         block_dpr = drop_path_rate * ( block_idx + sum(layers[:index])) / (sum(layers) - 1)
@@ -268,8 +303,7 @@ def basic_blocks(dim, index, layers,
             drop=drop_rate, drop_path=block_dpr,
             use_layer_scale=use_layer_scale,
             layer_scale_init_value=layer_scale_init_value,
-            s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-            useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt
+            params=params
             )
         )
     blocks = nn.Sequential(*blocks)
@@ -287,8 +321,7 @@ class BaseFormer(nn.Module):
                  fork_feat=False,
                  init_cfg=None,
                  pretrained=None,
-                 s_att_ks=7, s_att_r=4, c_att_ks=7, c_att_r=8,
-                 useBN=False, useSpatialAtt=False, useChannelAtt=False,
+                 params = params,
                  **kwargs):
 
         super().__init__()
@@ -309,8 +342,7 @@ class BaseFormer(nn.Module):
                                  drop_path_rate=drop_path_rate,
                                  use_layer_scale=use_layer_scale,
                                  layer_scale_init_value=layer_scale_init_value,
-                                 s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-                                 useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt)
+                                 params=params)
             network.append(stage)
             if i >= len(layers) - 1:
                 break
@@ -434,145 +466,33 @@ class BaseFormer(nn.Module):
         return cls_out
 
 
+
 @register_model
-def fct_s12_64_7478_TTT(pretrained=False, **kwargs):
+def fcvt_s12_64(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["mix_size_1"] = 5
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
+
     layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
-    useBN, useSpatialAtt, useChannelAtt = True, True, True
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-@register_model
-def fct_s12_64_7478_TFT(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
-    useBN, useSpatialAtt, useChannelAtt = True, False, True
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-@register_model
-def fct_s12_64_7418_TFT(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 1, 8
-    useBN, useSpatialAtt, useChannelAtt = True, False, True
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-@register_model
-def fct_s12_64_7478_TTF(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
-    useBN, useSpatialAtt, useChannelAtt = True, True, False
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-
-@register_model
-def fct_s12_64_7478_FFF(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 4, 7, 8
-    useBN, useSpatialAtt, useChannelAtt = False, False, False
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-
-@register_model
-def fct_s12_64_7118_TTT(pretrained=False, **kwargs):
-    layers = [2, 2, 6, 2]
-    embed_dims = [64, 128, 320, 512]
-    mlp_ratios = [4, 4, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 1, 1, 8
-    useBN, useSpatialAtt, useChannelAtt = True, True, True
-    downsamples = [True, True, True, True]
-    model = BaseFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
-        **kwargs)
-    model.default_cfg = default_cfgs['s']
-    return model
-
-
-@register_model
-def fct_s24_64_7118_TTT_8844(pretrained=False, **kwargs):
-    layers = [4, 4, 12, 4]
     embed_dims = [64, 128, 320, 512]
     mlp_ratios = [8, 8, 4, 4]
-    # spatial-kernelsize, spatial-stride, channel-adaptive_size, channel-channel_reduction
-    s_att_ks, s_att_r, c_att_ks, c_att_r=7, 1, 1, 8
-    useBN, useSpatialAtt, useChannelAtt = True, True, True
     downsamples = [True, True, True, True]
+
     model = BaseFormer(
         layers, embed_dims=embed_dims,
         mlp_ratios=mlp_ratios, downsamples=downsamples,
-        s_att_ks=s_att_ks, s_att_r=s_att_r, c_att_ks=c_att_ks, c_att_r=c_att_r,
-        useBN=useBN, useSpatialAtt=useSpatialAtt, useChannelAtt=useChannelAtt,
+        params = fcvt_params,
         **kwargs)
     model.default_cfg = default_cfgs['s']
     return model
+
 
 
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fct_s12_64_7478_FFF()
+    model = fcvt_s12_64()
     out = model(input)
     print(model)
     print(out.shape)
