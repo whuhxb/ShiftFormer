@@ -94,6 +94,8 @@ def main():
     model = timm.create_model(model_name=args.model,pretrained=True)
     model.blocks[args.layer].attn.register_forward_hook(get_attention_score)
     out = model(image)
+    if type(out) is tuple:
+        out =out[0]
     possibility = torch.softmax(out,dim=1).max()
     value, index = torch.max(out, dim=1)
     print(f'Prediction is: {object_categories[index]} possibility: {possibility*100:.3f}%')
