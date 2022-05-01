@@ -41,14 +41,14 @@ except:
     print("Using Pytorch  for DW-Conv")
     class DWConv2D(nn.Conv2d):
         def __init__(self, in_channels, kernel_size, bias=True):
-            super().__init__(1, in_channels, in_channels, kernel_size,stride=1,
+            super().__init__(in_channels, in_channels, kernel_size, stride=1,
                              padding= kernel_size//2,  groups=in_channels, bias=bias)
 
 params= {
     "spatial_mixer":{
         "mix_size_1": 5,
         "useSecondTokenMix": True,
-        "mix_size_2": 5,
+        "mix_size_2": 7,
         "useSpatialAtt": True,
         "weighted_gc": True
     },
@@ -125,8 +125,7 @@ class SpatialAtt(nn.Module):
     def __init__(self, dim, act_layer=nn.GELU, params = params):
         super().__init__()
         self.spatial_att = nn.Sequential(
-            nn.Conv2d(dim, dim, kernel_size=params["spatial_att"]["kernel_size"],
-                      stride=1, groups=dim, padding=params["spatial_att"]["kernel_size"]//2),
+            DWConv2D(dim, kernel_size=params["spatial_att"]["kernel_size"]),
             act_layer(),
             nn.Conv2d(dim, dim,1),
             nn.Sigmoid()
@@ -148,7 +147,7 @@ class ChannelAtt(nn.Module):
 
     def forward(self, x):
         res = x.clone()
-        x = self.avg_pool(x)
+        x = self.avg_pool(self.act(x))
         x = self.channelConv1(x.squeeze(-1).transpose(-1, -2))
         x = self.act(x)
         x = self.channelConv2(x)
@@ -162,7 +161,6 @@ class GlobalContext(nn.Module):
         super().__init__()
         self.global_context = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
-
             nn.Conv2d(dim, dim, 1)
         )
 
@@ -184,9 +182,7 @@ class TokenMixer(nn.Module):
 
         if params["spatial_mixer"]["useSecondTokenMix"]:
             self.gc2 = GlobalContext(dim)
-            self.dw2 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_2"],
-                                padding=(params["spatial_mixer"]["mix_size_2"]*2-1)//2,
-                                stride=1, groups=dim, dilation=2)
+            self.dw2 = DWConv2D(dim, params["spatial_mixer"]["mix_size_2"])
             self.fc2 = nn.Conv2d(dim, dim, kernel_size=1, padding=0, stride=1, groups=1)
 
         if params["spatial_mixer"]["useSpatialAtt"]:
@@ -212,7 +208,6 @@ class TokenMixer(nn.Module):
         gc1 = self.gc1(x)
         # TODO: consider the weighted_gc
         if self.weighted_gc:
-
             x +=gc1
         else:
             x +=gc1
@@ -239,8 +234,7 @@ class ChannelMixer(nn.Module):
         self.act = act_layer()
         self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
         if params["channel_mixer"]["useDWconv"]:
-            self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, params["channel_mixer"]["DWconv_size"],
-                            1, params["channel_mixer"]["DWconv_size"]//2, bias=True, groups=hidden_dim)
+            self.dwconv = DWConv2D(hidden_dim, params["channel_mixer"]["DWconv_size"])
         self.fc2 = nn.Conv2d(hidden_dim, dim, 1)
         self.drop = nn.Dropout(drop)
         if self.useChannelAtt:
@@ -484,10 +478,9 @@ class BaseFormer(nn.Module):
 
 
 @register_model
-def fcvt_s12_64(pretrained=False, **kwargs):
+def fcvt_s12_64_FFFF(pretrained=False, **kwargs):
 
     fcvt_params = params.copy()
-    fcvt_params["spatial_mixer"]["mix_size_1"] = 9
     fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
     fcvt_params["channel_mixer"]["useDWconv"] = False
     fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
@@ -507,11 +500,172 @@ def fcvt_s12_64(pretrained=False, **kwargs):
     return model
 
 
+@register_model
+def fcvt_s12_64_TFFF(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
+    fcvt_params["channel_mixer"]["useChannelAtt"] = False
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
+@register_model
+def fcvt_s12_64_FTFF(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
+    fcvt_params["channel_mixer"]["useDWconv"] = True
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
+    fcvt_params["channel_mixer"]["useChannelAtt"] = False
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
+@register_model
+def fcvt_s12_64_FFTF(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
+    fcvt_params["channel_mixer"]["useChannelAtt"] = False
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
+@register_model
+def fcvt_s12_64_FFFT(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
+    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
+
+@register_model
+def fcvt_s12_64_FFTT(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
+    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
+@register_model
+def fcvt_s12_64_TTTT(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
+    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
+@register_model
+def fcvt_s12_64_TFTT(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
+    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
 
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fcvt_s12_64()
+    model = fcvt_s12_64_FFFF()
     out = model(input)
     print(model)
     print(out.shape)
