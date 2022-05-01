@@ -164,8 +164,11 @@ class TokenMixer(nn.Module):
         self.useSpatialAtt = params["spatial_mixer"]["useSpatialAtt"]
         self.weighted_gc = params["spatial_mixer"]["weighted_gc"]
         self.gc1 = GlobalContext(dim)
+        # self.dw1 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_1"],
+        #                      padding=params["spatial_mixer"]["mix_size_1"]//2, stride=1, groups=dim)
         self.dw1 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_1"],
-                             padding=params["spatial_mixer"]["mix_size_1"]//2, stride=1, groups=dim)
+                                padding=(params["spatial_mixer"]["mix_size_1"]*2-1)//2,
+                                stride=1, groups=dim, dilation=2)
         self.fc1 = nn.Conv2d(dim, dim, kernel_size=1, padding=0, stride=1, groups=1)
 
         if params["spatial_mixer"]["useSecondTokenMix"]:
