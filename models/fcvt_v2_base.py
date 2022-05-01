@@ -234,7 +234,8 @@ class ChannelMixer(nn.Module):
         self.act = act_layer()
         self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
         if params["channel_mixer"]["useDWconv"]:
-            self.dwconv = DWConv2D(hidden_dim, params["channel_mixer"]["DWconv_size"])
+            ks=params["channel_mixer"]["DWconv_size"]
+            self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, ks, padding=ks//2)
         self.fc2 = nn.Conv2d(hidden_dim, dim, 1)
         self.drop = nn.Dropout(drop)
         if self.useChannelAtt:
@@ -665,7 +666,7 @@ def fcvt_s12_64_TFTT(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fcvt_s12_64_TFTT()
+    model = fcvt_s12_64_FTFF()
     out = model(input)
     print(model)
     print(out.shape)
