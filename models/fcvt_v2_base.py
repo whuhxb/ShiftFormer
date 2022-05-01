@@ -235,7 +235,7 @@ class ChannelMixer(nn.Module):
         self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
         if params["channel_mixer"]["useDWconv"]:
             ks=params["channel_mixer"]["DWconv_size"]
-            self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, ks, padding=ks//2)
+            self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, ks, padding=ks//2, groups=hidden_dim)
         self.fc2 = nn.Conv2d(hidden_dim, dim, 1)
         self.drop = nn.Dropout(drop)
         if self.useChannelAtt:
