@@ -46,6 +46,7 @@ except:
 
 params= {
     "spatial_mixer":{
+        "use_globalcontext":True,
         "mix_size_1": 5,
         "useSecondTokenMix": True,
         "mix_size_2": 7,
@@ -174,14 +175,16 @@ class TokenMixer(nn.Module):
         self.act = act_layer()
         self.useSpatialAtt = params["spatial_mixer"]["useSpatialAtt"]
         self.weighted_gc = params["spatial_mixer"]["weighted_gc"]
-        self.gc1 = GlobalContext(dim)
+        if params["spatial_mixer"]["use_globalcontext"]:
+            self.gc1 = GlobalContext(dim)
         # self.dw1 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_1"],
         #                      padding=params["spatial_mixer"]["mix_size_1"]//2, stride=1, groups=dim)
         self.dw1 = DWConv2D(dim, params["spatial_mixer"]["mix_size_1"])
         self.fc1 = nn.Conv2d(dim, dim, kernel_size=1, padding=0, stride=1, groups=1)
 
         if params["spatial_mixer"]["useSecondTokenMix"]:
-            self.gc2 = GlobalContext(dim)
+            if params["spatial_mixer"]["use_globalcontext"]:
+                self.gc2 = GlobalContext(dim)
             self.dw2 = DWConv2D(dim, params["spatial_mixer"]["mix_size_2"])
             self.fc2 = nn.Conv2d(dim, dim, kernel_size=1, padding=0, stride=1, groups=1)
 
@@ -205,21 +208,23 @@ class TokenMixer(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        gc1 = self.gc1(x)
-        # TODO: consider the weighted_gc
-        if self.weighted_gc:
-            x +=gc1
-        else:
-            x +=gc1
-        x = self.act(self.fc1(self.dw1(x)))
-
-        if hasattr(self, "gc2"):
-            gc2 = self.gc2(x)
+        if hasattr(self,"gc1"):
+            gc1 = self.gc1(x)
             # TODO: consider the weighted_gc
             if self.weighted_gc:
-                x +=gc2
+                x +=gc1
             else:
-                x +=gc2
+                x +=gc1
+        x = self.act(self.fc1(self.dw1(x)))
+
+        if hasattr(self, "fc2"):
+            if hasattr(self, "gc2"):
+                gc2 = self.gc2(x)
+                # TODO: consider the weighted_gc
+                if self.weighted_gc:
+                    x +=gc2
+                else:
+                    x +=gc2
             x = self.act(self.fc2(self.dw2(x)))
         if self.useSpatialAtt:
             x = self.spatial_att(x)
@@ -500,6 +505,30 @@ def fcvt_s12_64_FFFF(pretrained=False, **kwargs):
     model.default_cfg = default_cfgs['s']
     return model
 
+@register_model
+def fcvt_s12_64_FFFF_nogc(pretrained=False, **kwargs):
+
+    fcvt_params = params.copy()
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
+    fcvt_params["channel_mixer"]["useChannelAtt"] = False
+    fcvt_params["spatial_mixer"]["use_globalcontext"] = False
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
 
 @register_model
 def fcvt_s12_64_TFFF(pretrained=False, **kwargs):
@@ -666,7 +695,7 @@ def fcvt_s12_64_TFTT(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fcvt_s12_64_FTFF()
+    model = fcvt_s12_64_FFFF()
     out = model(input)
     print(model)
     print(out.shape)
