@@ -139,7 +139,7 @@ class SpatialAtt(nn.Module):
         )
 
     def forward(self,x):
-        return x * self.spatial_att(x).contiguous()
+        return x * self.spatial_att(x.contiguous()).contiguous()
 
 
 class ChannelAtt(nn.Module):
@@ -235,7 +235,7 @@ class TokenMixer(nn.Module):
                 x +=gc1
             else:
                 x +=gc1
-        x = self.act(self.fc1(self.dw1(x)).contiguous())
+        x = self.act(self.fc1(self.dw1(x.contiguous())).contiguous())
 
         if hasattr(self, "fc2"):
             if hasattr(self, "gc2"):
@@ -245,7 +245,7 @@ class TokenMixer(nn.Module):
                     x +=gc2
                 else:
                     x +=gc2
-            x = self.act(self.fc2(self.dw2(x)).contiguous())
+            x = self.act(self.fc2(self.dw2(x.contiguous())).contiguous())
         if self.useSpatialAtt:
             x = self.spatial_att(x)
         return x
