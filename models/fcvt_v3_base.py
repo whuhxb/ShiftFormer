@@ -515,13 +515,13 @@ class BaseFormer(nn.Module):
 
 
 @register_model
-def fcvt_v3_s12_64_TTTT(pretrained=False, **kwargs):
+def fcvt_v3_s12_64_TFFF(pretrained=False, **kwargs):
 
     fcvt_params = params.copy()
     fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
-    fcvt_params["channel_mixer"]["useDWconv"] = True
-    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
-    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
+    fcvt_params["channel_mixer"]["useChannelAtt"] = False
 
     layers = [2, 2, 6, 2]
     embed_dims = [64, 128, 320, 512]
