@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=512Gb
 #SBATCH --time=1-23:59:00
-#SBATCH --output=%j_fcvt_s12_64_TFFF.log
+#SBATCH --output=%j_fcvt_s12_64_TFFF_EMA.log
 
 source activate timm
 cd /scratch/ma.xu1/ShiftFormer
