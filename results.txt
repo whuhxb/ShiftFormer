@@ -1,0 +1,116 @@
+cd /dev/shm/
+mkdir imagenet
+cd imagenet
+wget -b https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_train.tar
+wget -b https://image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar
+
+
+
+fct14_s12_64_7478_FFF
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fct14_s12_64_7478_FFF -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
+
+
+
+
+shuffle operation, 1 token stride 73.87799993408203
+
+
+
+Shift speed: 6000imgs/s
+conv3x3 6000imgs/s
+conv5x5 5500imgs/s
+
+[B,C,W,H]  [B,WH,C] conv1d(WH, WH,3)  
+[B,C,W,H]  [B,W,C,H]  conv2d (3,3) [B,H,C,W]
+
+Overlapped Patch embedding 
+model10_static_shiftformer_s12-224 77.88199997802734 (epoch 288) 
+model10_s12_8844 			       78.59800013427734 (epoch 287)
+model10_s24_8844				   81.2499999731445
+
+
+
+
+fct_s12_64_7478_TFT				79.778		3993.19/s
+fct_s12_64_7118_TTT				80.168		3420.69/s
+fct_s12_64_7478_TTF				79.730		3718.43/s
+fct_s12_64_7478_TTT				79.724		3344.70/s
+fct_s12_64_7478_FFF				79.594		4483.86/s  ==fct_s12_64_7118_FFF
+fct_s24_64_7118_TTT_8844		82.429
+
+
+
+fct_s12_64_7118_TTT				80.168		3420.69/s
+
+
+fct_s12_64_7118_TTT_normpatch	79.9760
+fct_s12_64_7118_TTT_2DWshift 	80.01799994
+fct_s12_64_7118_TTT_CDWshift	79.97400008056641
+fct_s12_64_7118_TTT_SDWshift	80.09399997802734	 3255.53/s
+fct_s12_64_7118_TTT_ECA			80.1620000756	3505.41/s
+fct_s12_64_7118_TTT_lk_token	80.2600
+fct_s12_64_7118_TTT_rm_cdwconv	80.069
+
+fct_s12_64_7118_TTT_ChannelConv	80.23999
+80.21000015625
+
+
+
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fct14_s12_64_7478_FFF -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
+
+speed baseline
+fct_s12_64_7478_FFF			79.594		4483.86/s  ==fct_s12_64_7118_FFF
+remove DW in MLP						5193.52/s					
+
+
+
+
+
+
+
+CUDA_VISIBLE_DEVICES=1 python throughput.py /dev/shm/imagenet  --model fct_s12_64_7478_FFF -b 128  --checkpoint /path/to/checkpoint 
+baseline: fct_s12_64_7478_FFF 		4453.00/s
+
+remove 5x5dilated in token-mixer  	4998.38/s
+change 5x5dilated in T-M to 5x5 	2269.65/s
+change 3x3DW in C-M to identy		2616.04/s
+
+
+
+
+
+
+demo1-6  Q： 23 83 98 143  Head: 0 3 6 9
+python3 single.py --image images/demo1.JPEG --model deit_base_patch16_224
+
+
+
+
+
+
+
+salloc -N 1 -p ai-jumpstart --gres=gpu:4 --cpus-per-task=64 --mem=512Gb
+squeue --format="%.18i %.9P %.50j %.8u %.2t %.10M %.6D %R" -p ai-jumpstart
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fcvt_v3_s12_64_TFFF -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
+----------fcvt------------
+useSecondTokenMix useDWconv useSpatialAtt useChannelAtt
+FFFF 	5106.87/s 	14.0M 2.3G			80.21000015625 (epoch 296)   No GC 79.819
+TFFF 	4216.39/s 	16.4M 2.5G 			81.06 (epoch 287)
+FTFF 	4554.38/s	14.2M 2.3G			80.41200005615234 (epoch 297)
+FFTF 	4478.38/s 	15.2M 2.5G
+FFFT	4837.12/s	14.0M 2.3G
+------------
+FFFF change the mixer-1 to dilated, almost no speed influence.
+FFFF change the mixer-1 from 5 to 9, speed down, from 5106.87/s to 4509.56/s
+FFFF mixer-1 size 9, change to optimized DWConv, from 4509.56/s to 5083.88/s 
+
+
+18 014 398 442 373 116
+
+
+
+fcvt_v3_s12_64_debug。 mlp_ratios = [6, 6, 4, 4] layers = [2, 2, 6, 2]    14.7M	2.4G
+fcvt_v3_s12_64_debug。 
+
+
