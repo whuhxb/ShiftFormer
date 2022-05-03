@@ -139,7 +139,7 @@ class SpatialAtt(nn.Module):
         )
 
     def forward(self,x):
-        return x * self.spatial_att(x)
+        return x * self.spatial_att(x).contiguous()
 
 
 class ChannelAtt(nn.Module):
@@ -235,7 +235,7 @@ class TokenMixer(nn.Module):
                 x +=gc1
             else:
                 x +=gc1
-        x = self.act(self.fc1(self.dw1(x)))
+        x = self.act(self.fc1(self.dw1(x)).contiguous())
 
         if hasattr(self, "fc2"):
             if hasattr(self, "gc2"):
@@ -245,7 +245,7 @@ class TokenMixer(nn.Module):
                     x +=gc2
                 else:
                     x +=gc2
-            x = self.act(self.fc2(self.dw2(x)))
+            x = self.act(self.fc2(self.dw2(x)).contiguous())
         if self.useSpatialAtt:
             x = self.spatial_att(x)
         return x
@@ -294,12 +294,12 @@ class ChannelMixer(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        x = self.fc1(x)
+        x = self.fc1(x).contiguous()
         if hasattr(self, "dwconv"):
             x = self.dwconv(x)
         x = self.act(x)
         x = self.drop(x)
-        x = self.fc2(x)
+        x = self.fc2(x).contiguous()
         x = self.drop(x)
         if self.useChannelAtt:
             x = self.channel_att(x)
@@ -563,7 +563,7 @@ def fcvt_v3_s12_64_debug(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fcvt_v3_s12_64_TTTT()
+    model = fcvt_v3_s12_64_TFFF()
     out = model(input)
     print(model)
     print(out.shape)
