@@ -139,7 +139,7 @@ class SpatialAtt(nn.Module):
         )
 
     def forward(self,x):
-        return x * self.spatial_att(x.contiguous()).contiguous()
+        return x.contiguous() * self.spatial_att(x.contiguous()).contiguous()
 
 
 class ChannelAtt(nn.Module):
@@ -296,7 +296,7 @@ class ChannelMixer(nn.Module):
     def forward(self, x):
         x = self.fc1(x).contiguous()
         if hasattr(self, "dwconv"):
-            x = self.dwconv(x)
+            x = self.dwconv(x).contiguous()
         x = self.act(x)
         x = self.drop(x)
         x = self.fc2(x).contiguous()
