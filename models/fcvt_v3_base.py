@@ -296,7 +296,7 @@ class ChannelMixer(nn.Module):
     def forward(self, x):
         x = self.fc1(x).contiguous()
         if hasattr(self, "dwconv"):
-            x = self.dwconv(x).contiguous()
+            x = self.dwconv(x.contiguous())
         x = self.act(x)
         x = self.drop(x)
         x = self.fc2(x).contiguous()
