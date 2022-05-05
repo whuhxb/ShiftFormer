@@ -219,11 +219,7 @@ class TokenMixer(nn.Module):
             if params["spatial_mixer"]["use_globalcontext"]:
                 self.gc2 = GlobalContext(dim, act_layer=act_layer, params=params)
             self.dw2 = DWConv2D(dim, params["spatial_mixer"]["mix_size_2"])
-            self.fc2 = nn.Sequential(
-                Rearrange('b c w h -> b w h c'),
-                nn.Linear(dim, dim),
-                Rearrange('b w h c -> b c w h')
-            )
+            self.fc2 = nn.Conv2d(dim, dim, 1)
 
         if params["spatial_mixer"]["useSpatialAtt"]:
             self.spatial_att = SpatialAtt(dim=dim, act_layer=act_layer, params=params)
@@ -248,19 +244,13 @@ class TokenMixer(nn.Module):
         if hasattr(self,"gc1"):
             gc1 = self.gc1(x)
             x = x + gc1
-        x = x.contiguous()
-        x =self.dw1(x)
-        x = self.act(self.fc1(x))
-        # x = self.act(self.fc1(self.dw1(x)))
-        x = x.contiguous()
+        x = self.act(self.fc1(self.dw1(x)))
 
         if hasattr(self, "fc2"):
             if hasattr(self, "gc2"):
                 gc2 = self.gc2(x)
                 x = x + gc2
-            x = x.contiguous()
             x = self.act(self.fc2(self.dw2(x)))
-            x = x.contiguous()
         if self.useSpatialAtt:
             x = self.spatial_att(x)
         return x
@@ -272,22 +262,12 @@ class ChannelMixer(nn.Module):
         hidden_dim = hidden_dim or dim
         self.useChannelAtt = params["channel_mixer"]["useChannelAtt"]
         self.act = act_layer()
-        # self.fc1 = nn.Sequential(
-        #     Rearrange('b c w h -> b w h c'),
-        #     nn.Linear(dim, hidden_dim)
-        # )
-        # if params["channel_mixer"]["useDWconv"]:
-        #     ks=params["channel_mixer"]["DWconv_size"]
-        #     self.dwconv = nn.Sequential(
-        #         Rearrange('b w h c -> b c w h'),
-        #         nn.Conv2d(hidden_dim, hidden_dim, ks, padding=ks//2, groups=hidden_dim),
-        #         Rearrange('b c w h -> b w h c')
-        #     )
-        #
-        # self.fc2 = nn.Sequential(
-        #     nn.Linear(hidden_dim, dim),
-        #     Rearrange('b w h c -> b c w h')
-        # )
+        self.fc1 = nn.Conv2d(dim, hidden_dim, 1)
+        if params["channel_mixer"]["useDWconv"]:
+            ks=params["channel_mixer"]["DWconv_size"]
+            self.dwconv = nn.Conv2d(hidden_dim, hidden_dim, ks, padding=ks//2, groups=hidden_dim)
+
+        self.fc2 =nn.Conv2d(hidden_dim, dim, 1)
         self.drop = nn.Dropout(drop)
         if self.useChannelAtt:
             self.channel_att = ChannelAtt(act_layer=act_layer, params=params)
@@ -309,13 +289,13 @@ class ChannelMixer(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        # x = self.fc1(x)
-        # if hasattr(self, "dwconv"):
-        #     x = self.dwconv(x)
-        # x = self.act(x)
-        # x = self.drop(x)
-        # x = self.fc2(x)
-        # x = self.drop(x)
+        x = self.fc1(x)
+        if hasattr(self, "dwconv"):
+            x = self.dwconv(x)
+        x = self.act(x)
+        x = self.drop(x)
+        x = self.fc2(x)
+        x = self.drop(x)
         if self.useChannelAtt:
             x = self.channel_att(x)
         return x
