@@ -254,6 +254,7 @@ class TokenMixer(nn.Module):
             x = x + gc1
         x = x.contiguous()
         x = self.act(self.fc1(self.dw1(x)))
+        x = x.contiguous()
 
         if hasattr(self, "fc2"):
             if hasattr(self, "gc2"):
@@ -261,6 +262,7 @@ class TokenMixer(nn.Module):
                 x = x + gc2
             x = x.contiguous()
             x = self.act(self.fc2(self.dw2(x)))
+            x = x.contiguous()
         if self.useSpatialAtt:
             x = self.spatial_att(x)
         return x
