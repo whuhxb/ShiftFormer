@@ -531,7 +531,7 @@ class BaseFormer(nn.Module):
 def fcvt_v4_s12_64_TFFF(pretrained=False, **kwargs):
 
     fcvt_params = params.copy()
-    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
     fcvt_params["channel_mixer"]["useDWconv"] = False
     fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
     fcvt_params["channel_mixer"]["useChannelAtt"] = False
