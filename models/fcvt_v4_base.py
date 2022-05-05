@@ -249,19 +249,20 @@ class TokenMixer(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        if hasattr(self,"gc1"):
-            gc1 = self.gc1(x)
-            x +=gc1
-        x = self.act(self.fc1(self.dw1(x)))
-
-        if hasattr(self, "fc2"):
-            if hasattr(self, "gc2"):
-                gc2 = self.gc2(x)
-                x +=gc2
-            x = self.act(self.fc2(self.dw2(x)))
-        if self.useSpatialAtt:
-            x = self.spatial_att(x)
         return x
+        # if hasattr(self,"gc1"):
+        #     gc1 = self.gc1(x)
+        #     x = x + gc1
+        # x = self.act(self.fc1(self.dw1(x)))
+        #
+        # if hasattr(self, "fc2"):
+        #     if hasattr(self, "gc2"):
+        #         gc2 = self.gc2(x)
+        #         x = x + gc2
+        #     x = self.act(self.fc2(self.dw2(x)))
+        # if self.useSpatialAtt:
+        #     x = self.spatial_att(x)
+        # return x
 
 
 class ChannelMixer(nn.Module):
@@ -307,16 +308,17 @@ class ChannelMixer(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        x = self.fc1(x)
-        if hasattr(self, "dwconv"):
-            x = self.dwconv(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
-        if self.useChannelAtt:
-            x = self.channel_att(x)
         return x
+        # x = self.fc1(x)
+        # if hasattr(self, "dwconv"):
+        #     x = self.dwconv(x)
+        # x = self.act(x)
+        # x = self.drop(x)
+        # x = self.fc2(x)
+        # x = self.drop(x)
+        # if self.useChannelAtt:
+        #     x = self.channel_att(x)
+        # return x
 
 
 class BasicBlock(nn.Module):
@@ -532,6 +534,7 @@ def fcvt_v4_s12_64_TFFF(pretrained=False, **kwargs):
 
     fcvt_params = params.copy()
     fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
+    fcvt_params["spatial_mixer"]["use_globalcontext"]=False
     fcvt_params["channel_mixer"]["useDWconv"] = False
     fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
     fcvt_params["channel_mixer"]["useChannelAtt"] = False
@@ -560,3 +563,12 @@ if __name__ == '__main__':
     out = model(input)
     # print(model)
     print(out.shape)
+
+
+
+    # test bp
+    y = torch.rand([2,1000])
+    for t in range(2000):
+        loss = (out - y).pow(2).sum()
+        loss.backward()
+        print(loss)
