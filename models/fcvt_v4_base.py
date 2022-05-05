@@ -136,11 +136,9 @@ class SpatialAtt(nn.Module):
         super().__init__()
         self.spatial_att = nn.Sequential(
             DWConv2D(dim, kernel_size=params["spatial_att"]["kernel_size"]),
-            Rearrange('b c w h -> b w h c'),
-            nn.Linear(dim, dim//params["spatial_att"]["dim_reduction"]),
+            nn.Conv2d(dim, dim//params["spatial_att"]["dim_reduction"], 1),
             act_layer(),
-            nn.Linear(dim//params["spatial_att"]["dim_reduction"], dim),
-            Rearrange('b w h c -> b c w h'),
+            nn.Conv2d(dim//params["spatial_att"]["dim_reduction"], dim, 1),
             nn.Sigmoid()
         )
 
@@ -514,11 +512,11 @@ def fcvt_v4_s12_64_TFFF(pretrained=False, **kwargs):
 
     fcvt_params = params.copy()
     fcvt_params["spatial_mixer"]["useSecondTokenMix"] = False
-    fcvt_params["spatial_mixer"]["use_globalcontext"]=False
+    fcvt_params["spatial_mixer"]["use_globalcontext"]=True
     fcvt_params["channel_mixer"]["useDWconv"] = False
     fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
     fcvt_params["channel_mixer"]["useChannelAtt"] = False
-    # fcvt_params["global_context"]["weighted_gc"] = True
+    fcvt_params["global_context"]["weighted_gc"] = False
     # fcvt_params["global_context"]["head"] = 8
 
     layers = [2, 2, 6, 2]
