@@ -250,7 +250,7 @@ class TokenMixer(nn.Module):
             x = x + gc1
         x = x.contiguous()
         x =self.dw1(x)
-        x = self.act(self.fc1(x.permute(0,2,3,1)).permute(0,3,1,2))
+        x = self.act(self.fc1(x.permute(0,2,3,1).contiguous()).permute(0,3,1,2).contiguous())
         # x = self.act(self.fc1(self.dw1(x)))
         x = x.contiguous()
 
