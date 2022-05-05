@@ -93,7 +93,7 @@ scontrol show jobid -dd 25435137
 
 salloc -N 1 -p ai-jumpstart --gres=gpu:8 --cpus-per-task=64 --mem=512Gb
 squeue --format="%.18i %.9P %.50j %.8u %.2t %.10M %.6D %R" -p ai-jumpstart
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fcvt_v3_s12_64_TFFF -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fcvt_v4_s12_64_TFFF -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
 ----------fcvt------------
 useSecondTokenMix useDWconv useSpatialAtt useChannelAtt
 FFFF 	5106.87/s 	14.0M 2.3G			80.21000015625 (epoch 296)   No GC 79.819
@@ -117,3 +117,19 @@ fcvt_v3_s12_64_debug。 mlp_ratios = [6, 6, 4, 4] layers = [2, 2, 6, 2]    14.7M
 fcvt_v3_s12_64_debug。 
 
 
+
+
+salloc --account=rrg-bengioy-ad --gres=gpu:v100l:4 --cpus-per-task=16 --mem=128Gb
+
+
+
+
+
+fcvt-V4:				
+useSecondTokenMix		False		True 		
+use_globalcontext		False		False
+weighted_gc				False		False
+useDWconv				False		False
+useSpatialAtt			False		False
+useChannelAtt			False		False
+						12.7/1.9 	14.0/2.1
