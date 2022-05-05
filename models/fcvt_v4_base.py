@@ -516,7 +516,7 @@ def fcvt_v4_s12_64_TFFF(pretrained=False, **kwargs):
     fcvt_params["channel_mixer"]["useDWconv"] = False
     fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
     fcvt_params["channel_mixer"]["useChannelAtt"] = False
-    fcvt_params["global_context"]["weighted_gc"] = False
+    fcvt_params["global_context"]["weighted_gc"] = True
     # fcvt_params["global_context"]["head"] = 8
 
     layers = [2, 2, 6, 2]
