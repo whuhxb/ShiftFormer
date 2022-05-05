@@ -251,7 +251,7 @@ class TokenMixer(nn.Module):
     def forward(self, x):
         if hasattr(self,"gc1"):
             gc1 = self.gc1(x)
-            x = x + gc1
+            x += gc1
         x = self.act(self.fc1(self.dw1(x)))
 
         if hasattr(self, "fc2"):
