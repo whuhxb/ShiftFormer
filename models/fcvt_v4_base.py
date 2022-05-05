@@ -213,11 +213,11 @@ class TokenMixer(nn.Module):
         # self.dw1 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_1"],
         #                      padding=params["spatial_mixer"]["mix_size_1"]//2, stride=1, groups=dim)
         self.dw1 = DWConv2D(dim, params["spatial_mixer"]["mix_size_1"])
-        self.fc1 = nn.Sequential(
-            Rearrange('b c w h -> b w h c'),
-            nn.Linear(dim, dim),
-            Rearrange('b w h c -> b c w h')
-        )
+        # self.fc1 = nn.Sequential(
+        #     Rearrange('b c w h -> b w h c'),
+        #     nn.Linear(dim, dim),
+        #     Rearrange('b w h c -> b c w h')
+        # )
 
         if params["spatial_mixer"]["useSecondTokenMix"]:
             if params["spatial_mixer"]["use_globalcontext"]:
@@ -253,7 +253,8 @@ class TokenMixer(nn.Module):
             gc1 = self.gc1(x)
             x = x + gc1
         x = x.contiguous()
-        x = self.act(self.fc1(self.dw1(x)))
+        # x = self.act(self.fc1(self.dw1(x)))
+        x = self.act(self.dw1(x))
         x = x.contiguous()
 
         if hasattr(self, "fc2"):
@@ -274,22 +275,22 @@ class ChannelMixer(nn.Module):
         hidden_dim = hidden_dim or dim
         self.useChannelAtt = params["channel_mixer"]["useChannelAtt"]
         self.act = act_layer()
-        self.fc1 = nn.Sequential(
-            Rearrange('b c w h -> b w h c'),
-            nn.Linear(dim, hidden_dim)
-        )
-        if params["channel_mixer"]["useDWconv"]:
-            ks=params["channel_mixer"]["DWconv_size"]
-            self.dwconv = nn.Sequential(
-                Rearrange('b w h c -> b c w h'),
-                nn.Conv2d(hidden_dim, hidden_dim, ks, padding=ks//2, groups=hidden_dim),
-                Rearrange('b c w h -> b w h c')
-            )
-
-        self.fc2 = nn.Sequential(
-            nn.Linear(hidden_dim, dim),
-            Rearrange('b w h c -> b c w h')
-        )
+        # self.fc1 = nn.Sequential(
+        #     Rearrange('b c w h -> b w h c'),
+        #     nn.Linear(dim, hidden_dim)
+        # )
+        # if params["channel_mixer"]["useDWconv"]:
+        #     ks=params["channel_mixer"]["DWconv_size"]
+        #     self.dwconv = nn.Sequential(
+        #         Rearrange('b w h c -> b c w h'),
+        #         nn.Conv2d(hidden_dim, hidden_dim, ks, padding=ks//2, groups=hidden_dim),
+        #         Rearrange('b c w h -> b w h c')
+        #     )
+        #
+        # self.fc2 = nn.Sequential(
+        #     nn.Linear(hidden_dim, dim),
+        #     Rearrange('b w h c -> b c w h')
+        # )
         self.drop = nn.Dropout(drop)
         if self.useChannelAtt:
             self.channel_att = ChannelAtt(act_layer=act_layer, params=params)
@@ -311,13 +312,13 @@ class ChannelMixer(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
-        x = self.fc1(x)
-        if hasattr(self, "dwconv"):
-            x = self.dwconv(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
+        # x = self.fc1(x)
+        # if hasattr(self, "dwconv"):
+        #     x = self.dwconv(x)
+        # x = self.act(x)
+        # x = self.drop(x)
+        # x = self.fc2(x)
+        # x = self.drop(x)
         if self.useChannelAtt:
             x = self.channel_att(x)
         return x
@@ -566,11 +567,3 @@ if __name__ == '__main__':
     # print(model)
     print(out.shape)
 
-
-
-    # test bp
-    y = torch.rand([2,1000])
-    for t in range(2000):
-        loss = (out - y).pow(2).sum()
-        loss.backward()
-        print(loss)
