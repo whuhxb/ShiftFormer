@@ -213,11 +213,7 @@ class TokenMixer(nn.Module):
         # self.dw1 = nn.Conv2d(dim, dim, kernel_size=params["spatial_mixer"]["mix_size_1"],
         #                      padding=params["spatial_mixer"]["mix_size_1"]//2, stride=1, groups=dim)
         self.dw1 = DWConv2D(dim, params["spatial_mixer"]["mix_size_1"])
-        # self.fc1 = nn.Sequential(
-        #     Rearrange('b c w h -> b w h c'),
-        #     nn.Linear(dim, dim),
-        #     Rearrange('b w h c -> b c w h')
-        # )
+        self.fc1 = nn.Linear(dim, dim)
 
         if params["spatial_mixer"]["useSecondTokenMix"]:
             if params["spatial_mixer"]["use_globalcontext"]:
@@ -253,8 +249,9 @@ class TokenMixer(nn.Module):
             gc1 = self.gc1(x)
             x = x + gc1
         x = x.contiguous()
+        x =self.dw1(x)
+        x = self.act(self.fc1(x.permute(0,2,3,1)).permute(0,3,1,2))
         # x = self.act(self.fc1(self.dw1(x)))
-        x = self.act(self.dw1(x))
         x = x.contiguous()
 
         if hasattr(self, "fc2"):
