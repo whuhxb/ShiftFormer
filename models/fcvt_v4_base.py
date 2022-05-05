@@ -195,7 +195,6 @@ class GlobalContext(nn.Module):
             sim = (sim-mean)/(std+self.epsilon)
             sim = sim * self.rescale_weight.unsqueeze(dim=0).unsqueeze(dim=-1) + self.rescale_bias.unsqueeze(dim=0).unsqueeze(dim=-1)
             sim = sim.reshape(b,self.head,1, w, h) # [b, head, 1, w, h]
-            print(sim.shape)
             gc = self.fc(gap.squeeze(dim=-1)).reshape(b,self.head,-1).unsqueeze(dim=-1).unsqueeze(dim=-1)  # [b, head, hdim, 1, 1]
             gc = rearrange(sim*gc, "b h d x y -> b (h d) x y")  # [b, head, hdim, w, h] - > [b,c,w,h]
         else:

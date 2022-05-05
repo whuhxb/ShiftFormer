@@ -88,9 +88,10 @@ python3 single.py --image images/demo1.JPEG --model deit_base_patch16_224
 
 
 
+List detailed information for a job (useful for troubleshooting):
+scontrol show jobid -dd 25435137
 
-
-salloc -N 1 -p ai-jumpstart --gres=gpu:4 --cpus-per-task=64 --mem=512Gb
+salloc -N 1 -p ai-jumpstart --gres=gpu:8 --cpus-per-task=64 --mem=512Gb
 squeue --format="%.18i %.9P %.50j %.8u %.2t %.10M %.6D %R" -p ai-jumpstart
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fcvt_v3_s12_64_TFFF -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
 ----------fcvt------------
@@ -100,6 +101,8 @@ TFFF 	4216.39/s 	16.4M 2.5G 			81.06 (epoch 287)
 FTFF 	4554.38/s	14.2M 2.3G			80.41200005615234 (epoch 297)
 FFTF 	4478.38/s 	15.2M 2.5G
 FFFT	4837.12/s	14.0M 2.3G
+TFTT    3407.22/s 	17.6M 2.7G			81.2959999243164 (epoch 285)
+	
 ------------
 FFFF change the mixer-1 to dilated, almost no speed influence.
 FFFF change the mixer-1 from 5 to 9, speed down, from 5106.87/s to 4509.56/s
