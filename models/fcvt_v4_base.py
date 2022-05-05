@@ -585,7 +585,7 @@ def fcvt_v4_s12_64_TFFF_gc_simple(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fcvt_v4_s12_64_TFFF()
+    model = fcvt_v4_s12_64_TFFF_nogc()
     out = model(input)
     # print(model)
     print(out.shape)
