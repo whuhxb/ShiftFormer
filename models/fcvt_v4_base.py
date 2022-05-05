@@ -249,20 +249,19 @@ class TokenMixer(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
+        if hasattr(self,"gc1"):
+            gc1 = self.gc1(x)
+            x = x + gc1
+        x = self.act(self.fc1(self.dw1(x)))
+
+        if hasattr(self, "fc2"):
+            if hasattr(self, "gc2"):
+                gc2 = self.gc2(x)
+                x = x + gc2
+            x = self.act(self.fc2(self.dw2(x)))
+        if self.useSpatialAtt:
+            x = self.spatial_att(x)
         return x
-        # if hasattr(self,"gc1"):
-        #     gc1 = self.gc1(x)
-        #     x = x + gc1
-        # x = self.act(self.fc1(self.dw1(x)))
-        #
-        # if hasattr(self, "fc2"):
-        #     if hasattr(self, "gc2"):
-        #         gc2 = self.gc2(x)
-        #         x = x + gc2
-        #     x = self.act(self.fc2(self.dw2(x)))
-        # if self.useSpatialAtt:
-        #     x = self.spatial_att(x)
-        # return x
 
 
 class ChannelMixer(nn.Module):
