@@ -39,4 +39,5 @@ from .fcvt_v3_base import fcvt_v3_s12_64_TFFF, fcvt_v3_s12_64_debug
 from .fcvt_v4_base import fcvt_v4_s12_64_TFFF_gc_weighted, fcvt_v4_s12_64_TFFF_gc_simple, fcvt_v4_s12_64_TFFF_nogc, \
     fcvt_v4_s12_64_debug, fcvt_v4_s12_64_TTTT_gc_weighted
 
-from .fcvt_v5_base import fcvt_v5_32_TFFF_nogc
+from .fcvt_v5_base import fcvt_v5_32_TTFF_W_3_3, fcvt_v5_32_TTFF_W_5_5, fcvt_v5_32_TTFF_W_5_9, fcvt_v5_32_TTFF_W_7_7, \
+    fcvt_v5_32_TTFF_W_7_9, fcvt_v5_32_TTFF_W_9_9, fcvt_v5_32_TTFF_W_11_11
