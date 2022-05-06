@@ -8,7 +8,7 @@ from fvcore.nn import FlopCountAnalysis
 from timm.models import deit_base_patch16_224, deit_small_patch16_224, deit_tiny_patch16_224
 
 
-model = models.fcvt_v4_s12_64_TFFF_gc_weighted()
+model = models.fcvt_v5_32_TFFF_nogc()
 # model = deit_tiny_patch16_224()
 
 inputs = (torch.randn((1,3,224,224)),)
