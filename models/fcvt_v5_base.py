@@ -741,7 +741,7 @@ def fcvt_v5_32_TTFF_W_11_11(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fcvt_v5_s12_64_TFFF_nogc()
+    model = fcvt_v5_32_TTFF_W_11_11()
     out = model(input)
     # print(model)
     print(out.shape)
