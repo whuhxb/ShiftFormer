@@ -93,7 +93,7 @@ scontrol show jobid -dd 25435137
 
 salloc -N 1 -p ai-jumpstart --gres=gpu:8 --cpus-per-task=64 --mem=512Gb
 squeue --format="%.18i %.9P %.50j %.8u %.2t %.10M %.6D %R" -p ai-jumpstart
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fcvt_v4_s12_64_TFFF -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fcvt_v4_s12_64_TTTT_gc_weighted -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
 ----------fcvt------------
 useSecondTokenMix useDWconv useSpatialAtt useChannelAtt
 FFFF 	5106.87/s 	14.0M 2.3G			80.21000015625 (epoch 296)   No GC 79.819
@@ -133,3 +133,61 @@ useDWconv				False		False
 useSpatialAtt			False		False
 useChannelAtt			False		False
 						12.7/1.9 	14.0/2.1
+
+
+
+
+params= {
+    "global_context":{
+        "weighted_gc": True,
+        "gc_reduction": 8,
+        "head": 8,
+    },
+    "spatial_mixer":{
+        "use_globalcontext":True,
+        "useSecondTokenMix": True,
+        "mix_size_1": 5,
+        "mix_size_2": 7,
+        "fc_factor": 8,
+        "fc_min_value": 16,
+        "useSpatialAtt": True
+    },
+    "channel_mixer":{
+        "useChannelAtt": True,
+        "useDWconv":True,
+        "DWconv_size":3
+    },
+    "spatial_att":{
+        "kernel_size": 3,
+        "dim_reduction":8
+    },
+    "channel_att":{
+        "size_1": 3,
+        "size_2": 5,
+    }
+}
+
+
+vqvae 离散化约束/泛化提高， GC引用别的领域的 information bottleneck 
+DISCRETE REPRESENTATIONS STRENGTHEN VISION TRANSFORMER ROBUSTNESS
+Discrete-Valued Neural Communication
+Neural message passing for quantum chemistry
+
+Concern:
+GC 的related work 是否不足
+
+三个大表 ： Image Cls, MSCoCo Det+InstSeg Mask RCNN, (ADE20K Semantic Seg)
+Ablation: 
+1. use globalcontext vs. no gc
+2. focus on the spatial_mixer, 
+2. component ablation 
+
+
+
+
+
+
+
+
+
+
