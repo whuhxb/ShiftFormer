@@ -738,6 +738,37 @@ def fcvt_v5_32_TTFF_W_11_11(pretrained=False, **kwargs):
     return model
 
 
+@register_model
+def fcvt_v5_32_TTFF_W_13_13(pretrained=False, **kwargs):
+    fcvt_params = params.copy()
+
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
+    fcvt_params["spatial_mixer"]["use_globalcontext"]=True
+    fcvt_params["spatial_mixer"]["mix_size_1"] = 13
+    fcvt_params["spatial_mixer"]["mix_size_2"]=13
+
+    fcvt_params["global_context"]["weighted_gc"] = True
+    # fcvt_params["global_context"]["head"] = 8
+
+    fcvt_params["channel_mixer"]["useDWconv"] = False
+
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
+    fcvt_params["channel_mixer"]["useChannelAtt"] = False
+
+    layers = [3, 3, 5, 2]
+    embed_dims = [32, 64, 160, 320]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)

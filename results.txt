@@ -172,9 +172,11 @@ vqvae 离散化约束/泛化提高， GC引用别的领域的 information bottle
 DISCRETE REPRESENTATIONS STRENGTHEN VISION TRANSFORMER ROBUSTNESS
 Discrete-Valued Neural Communication
 Neural message passing for quantum chemistry
+MASTERING ATARI WITH DISCRETE WORLD MODELS 
 
 Concern:
 GC 的related work 是否不足
+
 
 三个大表 ： Image Cls, MSCoCo Det+InstSeg Mask RCNN, (ADE20K Semantic Seg)
 Ablation: 
@@ -182,6 +184,7 @@ Ablation:
 2. focus on the spatial_mixer, 
 2. component ablation 
 
+可视化weighted gc, loss landscape,  global context vs spatial attention (做的是不是同一件事)，
 
 
 
@@ -190,4 +193,11 @@ Ablation:
 
 
 
+
+fcvt_v5_32_TTFF_W_11_11		73.5340000
+fcvt_v5_32_TTFF_W_9_9		73.05400
+fcvt_v5_32_TTFF_W_7_7		73.42000
+fcvt_v5_32_TTFF_W_5_5		
+fcvt_v5_32_TTFF_W_3_3
+fcvt_v5_32_TTFF_W_7_9
 
