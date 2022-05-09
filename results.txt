@@ -197,7 +197,7 @@ Ablation:
 fcvt_v5_32_TTFF_W_11_11		73.5340000
 fcvt_v5_32_TTFF_W_9_9		73.05400
 fcvt_v5_32_TTFF_W_7_7		73.42000
-fcvt_v5_32_TTFF_W_5_5		
-fcvt_v5_32_TTFF_W_3_3
-fcvt_v5_32_TTFF_W_7_9
+fcvt_v5_32_TTFF_W_5_5		73.225999
+fcvt_v5_32_TTFF_W_3_3		73.24999998
+fcvt_v5_32_TTFF_W_7_9		73.3780000122
 
