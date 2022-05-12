@@ -43,4 +43,5 @@ from .fcvt_v5_base import fcvt_v5_32_TTFF_W_3_3, fcvt_v5_32_TTFF_W_5_5, fcvt_v5_
     fcvt_v5_32_TTFF_W_7_9, fcvt_v5_32_TTFF_W_9_9, fcvt_v5_32_TTFF_W_11_11, fcvt_v5_32_TTFF_W_13_13, \
     fcvt_v5_32_TFFF_11_11, fcvt_v5_32_TTFF_NotW_11_11,\
     fcvt_v5_32_TTFF_W_11_11_H1, fcvt_v5_32_TTFF_W_11_11_H4, fcvt_v5_32_TTFF_W_11_11_H16,fcvt_v5_32_TTFF_W_11_11_H32, \
-    fcvt_v5_32_TTFF_W_11_11_H8_compete
+    fcvt_v5_32_TTFF_W_11_11_H8_compete, \
+    fcvt_v5_32_TTFF_W_11_11_H8_compete_TTF, fcvt_v5_32_TTFF_W_11_11_H8_compete_TTT,fcvt_v5_32_TTFF_W_11_11_H8_compete_FTT,fcvt_v5_32_TTFF_W_11_11_H8_compete_TFF,fcvt_v5_32_TTFF_W_11_11_H8_compete_TFT
