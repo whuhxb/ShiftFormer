@@ -212,9 +212,13 @@ With Direct GC: 25663076_fcvt_v5_32_TTFF_NotW_11_11 73.0199
 With dynamic GC:fcvt_v5_32_TTFF_W_11_11             73.5340000
 
 Similarity groups (Wrong mapping, doesnt matter):
-H4  25724742 fcvt_v5_32_TTFF_W_11_11_H4_ema.sh          73.414
-H16 25724740 fcvt_v5_32_TTFF_W_11_11_H1_ema.sh          73.33
 H4  25724743 fcvt_v5_32_TTFF_W_11_11_H16_ema.sh 
-H1  25767404 fcvt_v5_32_TTFF_W_11_11_H1updated_ema.sh   
+H1  25767404 fcvt_v5_32_TTFF_W_11_11_H1updated_ema.sh   73.2240
+H4  25724742 fcvt_v5_32_TTFF_W_11_11_H4_ema.sh          73.414
 H8                                                      73.534
+H16 25724740 fcvt_v5_32_TTFF_W_11_11_H1_ema.sh          73.33
+H32 25724745_fcvt_v5_32_TTFF_W_11_11_H32.log            73.29400
+
+
+
 H32
