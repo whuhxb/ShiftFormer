@@ -209,6 +209,9 @@ Kernel Size in tokenmixer:
 25686391_fcvt_v5_32_TFFF_11_11   72.776
 25663076_fcvt_v5_32_TTFF_NotW_11_11 73.0199
 
+Wrong mapping:
+H4  25724742 fcvt_v5_32_TTFF_W_11_11_H4_ema.sh  73.414
+H16 25724740 fcvt_v5_32_TTFF_W_11_11_H1_ema.sh  73.33
+H4  25724743 fcvt_v5_32_TTFF_W_11_11_H16_ema.sh 
 
-H4  25724742 fcvt_v5_32_TTFF_W_11_11_H4_ema.sh  
-    25724740 fcvt_v5_32_TTFF_W_11_11_H1_ema.sh 
+
