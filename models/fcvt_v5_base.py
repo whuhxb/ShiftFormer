@@ -49,6 +49,7 @@ params= {
     "global_context":{
         "weighted_gc": True,
         "gc_reduction": 8,
+        "compete": False,
         "head": 8,
     },
     "spatial_mixer":{
@@ -170,11 +171,18 @@ class ChannelAtt(nn.Module):
 class GlobalContext(nn.Module):
     def __init__(self, dim, act_layer=nn.GELU, params=params):
         super().__init__()
-        self.fc = nn.Sequential(
-            nn.Linear(dim, dim//params["global_context"]["gc_reduction"]),
-            act_layer(),
-            nn.Linear(dim//params["global_context"]["gc_reduction"], dim)
-        )
+        # bottleneck information
+        # "Compete to compute." NeurIPS 2013
+        self.compete = params["global_context"]["compete"]
+        if self.compete:
+            self.fc1 = nn.Linear(dim, 2*dim//params["global_context"]["gc_reduction"])
+            self.fc2 = nn.Linear(dim//params["global_context"]["gc_reduction"], dim)
+        else:
+            self.fc = nn.Sequential(
+                nn.Linear(dim, dim//params["global_context"]["gc_reduction"]),
+                act_layer(),
+                nn.Linear(dim//params["global_context"]["gc_reduction"], dim)
+            )
         self.weight_gc = params["global_context"]["weighted_gc"]
         if self.weight_gc:
             self.head = params["global_context"]["head"]
@@ -182,6 +190,17 @@ class GlobalContext(nn.Module):
             self.rescale_weight = nn.Parameter(torch.ones(self.head))
             self.rescale_bias = nn.Parameter(torch.zeros(self.head))
             self.epsilon = 1e-5
+
+    def _get_gc(self, gap): # gap [b,c]
+        if self.compete:
+            b,c = gap.size()
+            gc = self.fc1(gap).reshape([b,2,-1])
+            gc, _ = gc.max(dim=1)
+            gc = self.fc2(gc)
+            return gc
+        else:
+            return self.fc(gap)
+
 
     def forward(self,x):
         if self.weight_gc:
@@ -194,10 +213,10 @@ class GlobalContext(nn.Module):
             sim = (sim-mean)/(std+self.epsilon)
             sim = sim * self.rescale_weight.unsqueeze(dim=0).unsqueeze(dim=-1) + self.rescale_bias.unsqueeze(dim=0).unsqueeze(dim=-1)
             sim = sim.reshape(b,self.head,1, w, h) # [b, head, 1, w, h]
-            gc = self.fc(gap.squeeze(dim=-1)).reshape(b,self.head,-1).unsqueeze(dim=-1).unsqueeze(dim=-1)  # [b, head, hdim, 1, 1]
+            gc = self._get_gc(gap.squeeze(dim=-1)).reshape(b,self.head,-1).unsqueeze(dim=-1).unsqueeze(dim=-1)  # [b, head, hdim, 1, 1]
             gc = rearrange(sim*gc, "b h d x y -> b (h d) x y")  # [b, head, hdim, w, h] - > [b,c,w,h]
         else:
-            gc = self.fc(x.mean(dim=-1).mean(dim=-1)).unsqueeze(dim=-1).unsqueeze(dim=-1)
+            gc = self._get_gc(x.mean(dim=-1).mean(dim=-1)).unsqueeze(dim=-1).unsqueeze(dim=-1)
         return gc  # [b,c,w,h] for weighted or [b,c,1,1]
 
 
@@ -956,7 +975,7 @@ def fcvt_v5_32_TTFF_W_13_13(pretrained=False, **kwargs):
 
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fcvt_v5_32_TTFF_W_11_11_H32()
+    model = fcvt_v5_32_TTFF_W_11_11()
     out = model(input)
     # print(model)
     print(out.shape)
