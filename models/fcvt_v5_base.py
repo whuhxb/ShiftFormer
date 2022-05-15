@@ -1214,8 +1214,8 @@ def fcvt_v5_64_B24(pretrained=False, **kwargs):
 
     fcvt_params["channel_mixer"]["useDWconv"] = True
 
-    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
-    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
+    fcvt_params["channel_mixer"]["useChannelAtt"] = False
 
     layers = [4, 4, 12, 4]
     embed_dims = [64, 128, 320, 512]
@@ -1246,8 +1246,8 @@ def fcvt_v5_64_B48(pretrained=False, **kwargs):
 
     fcvt_params["channel_mixer"]["useDWconv"] = True
 
-    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
-    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = False
+    fcvt_params["channel_mixer"]["useChannelAtt"] = False
 
     layers = [8, 8, 24, 8]
     embed_dims = [64, 128, 320, 512]
