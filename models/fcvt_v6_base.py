@@ -275,14 +275,14 @@ class TokenMixer(nn.Module):
         if hasattr(self,"gc1"):
             gc1 = self.gc1(x)
             x = x + gc1
-        x = self.act(self.fc1(self.dw1(x).permute(0,2,3,1))).permute(0,3,1,2)
+        x = self.act(self.fc1(self.dw1(x.contiguous()).permute(0,2,3,1).contiguous())).permute(0,3,1,2).contiguous()
         x = x.contiguous()
 
         if hasattr(self, "fc2"):
             if hasattr(self, "gc2"):
                 gc2 = self.gc2(x)
                 x = x + gc2
-            x = self.act(self.fc2(self.dw2(x).permute(0,2,3,1))).permute(0,3,1,2)
+            x = self.act(self.fc2(self.dw2(x.contiguous()).permute(0,2,3,1).contiguous())).permute(0,3,1,2).contiguous()
         x = x.contiguous()
         if self.useSpatialAtt:
             x = self.spatial_att(x)
