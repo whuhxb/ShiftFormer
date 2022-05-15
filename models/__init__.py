@@ -46,3 +46,6 @@ from .fcvt_v5_base import fcvt_v5_32_TTFF_W_3_3, fcvt_v5_32_TTFF_W_5_5, fcvt_v5_
     fcvt_v5_32_TTFF_W_11_11_H8_compete, \
     fcvt_v5_32_TTFF_W_11_11_H8_compete_TTF, fcvt_v5_32_TTFF_W_11_11_H8_compete_TTT,fcvt_v5_32_TTFF_W_11_11_H8_compete_FTT,fcvt_v5_32_TTFF_W_11_11_H8_compete_TFF,fcvt_v5_32_TTFF_W_11_11_H8_compete_TFT, \
     fcvt_v5_64_B12, fcvt_v5_64_B24, fcvt_v5_64_B48
+
+
+from .fcvt_v6_base import fcvt_v6_64_B12
