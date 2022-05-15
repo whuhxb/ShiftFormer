@@ -32,11 +32,11 @@ except ImportError:
     has_mmdet = False
 
 try:
-    from depthwise_conv2d_implicit_gemm import DepthWiseConv2dImplicitGEMM
-    print("Using DepthWiseConv2dImplicitGEMM for DW-Conv")
-    class DWConv2D(DepthWiseConv2dImplicitGEMM):
+    print("Using Pytorch  for DW-Conv v6")
+    class DWConv2D(nn.Conv2d):
         def __init__(self, in_channels, kernel_size, bias=True):
-            super().__init__( in_channels, kernel_size, bias)
+            super().__init__(in_channels, in_channels, kernel_size, stride=1,
+                             padding= kernel_size//2,  groups=in_channels, bias=bias)
 
 except:
     print("Using Pytorch  for DW-Conv")
