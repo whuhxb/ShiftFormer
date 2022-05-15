@@ -207,9 +207,10 @@ Kernel Size in tokenmixer:
 73.210    73.534    73.054  73.378  73.420 73.2259  73.2499
 
 Effectiveness of GC:
-Without GC:     25686391_fcvt_v5_32_TFFF_11_11      72.776
-With Direct GC: 25663076_fcvt_v5_32_TTFF_NotW_11_11 73.0199
-With dynamic GC:fcvt_v5_32_TTFF_W_11_11             73.5340000
+Without GC:     25686391_fcvt_v5_32_TFFF_11_11                      72.776
+With Direct GC: 25663076_fcvt_v5_32_TTFF_NotW_11_11                 73.0199
+With dynamic GC:fcvt_v5_32_TTFF_W_11_11                             73.5340000
+With compte GC: 25827667fcvt_v5_32_TTFF_W_11_11_H8_compete_ema.sh   73.724000
 
 Similarity groups (Wrong mapping, doesnt matter):
 H4  25724743 fcvt_v5_32_TTFF_W_11_11_H16_ema.sh 
@@ -220,5 +221,28 @@ H16 25724740 fcvt_v5_32_TTFF_W_11_11_H1_ema.sh          73.33
 H32 25724745_fcvt_v5_32_TTFF_W_11_11_H32.log            73.29400
 
 
+component analysis:
+GC dw-conv. spatialatt channatt
+FFFF 72.776   25686391_fcvt_v5_32_TFFF_11_11  
+TFFF 73.724   25827667fcvt_v5_32_TTFF_W_11_11_H8_compete_ema
+TTFF 74.878   25830146_fcvt_v5_32_TTFF_W_11_11_H8_compete_TFF.log  
+TTTF  
+TTFT 75.030     
+TFTT  
+TTTT  
+
+
 
 H32
+
+
+
+
+          25830157 ai-jumpst      fcvt_v5_32_TTFF_W_11_11_H8_compete_TTF_ema.sh   ma.xu1 PD       0:00      1 (Resources)
+          25830158 ai-jumpst      fcvt_v5_32_TTFF_W_11_11_H8_compete_FTT_ema.sh   ma.xu1 PD       0:00      1 (
+          25830159 ai-jumpst      fcvt_v5_32_TTFF_W_11_11_H8_compete_TTT_ema.sh   ma.xu1 PD       0:00      1 
+          25827667 ai-jumpst          fcvt_v5_32_TTFF_W_11_11_H8_compete_ema.sh   ma.xu1  R   23:34:22      1 d3148
+          25830146 ai-jumpst      fcvt_v5_32_TTFF_W_11_11_H8_compete_TFF_ema.sh   ma.xu1  R   21:55:23      1 d3149
+          25830135 ai-jumpst      fcvt_v5_32_TTFF_W_11_11_H8_compete_TFT_ema.sh   ma.xu1  R   21:55:49      1 d3146
+          25827655 ai-jumpst                                               bash   ma.xu1  R   23:58:44      1 d3150
+

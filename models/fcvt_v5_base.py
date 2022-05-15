@@ -1165,9 +1165,108 @@ def fcvt_v5_32_TTFF_W_11_11_H8_compete_FTT(pretrained=False, **kwargs):
     model.default_cfg = default_cfgs['s']
     return model
 
+
+
+@register_model
+def fcvt_v5_64_B12(pretrained=False, **kwargs):
+    fcvt_params = params.copy()
+
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
+    fcvt_params["spatial_mixer"]["use_globalcontext"]=True
+    fcvt_params["spatial_mixer"]["mix_size_1"] = 11
+    fcvt_params["spatial_mixer"]["mix_size_2"]=11
+
+    fcvt_params["global_context"]["weighted_gc"] = True
+    fcvt_params["global_context"]["head"] = 8
+    fcvt_params["global_context"]["compete"] = True
+
+    fcvt_params["channel_mixer"]["useDWconv"] = True
+
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
+    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+
+    layers = [2, 2, 6, 2]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['s']
+    return model
+
+
+@register_model
+def fcvt_v5_64_B24(pretrained=False, **kwargs):
+    fcvt_params = params.copy()
+
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
+    fcvt_params["spatial_mixer"]["use_globalcontext"]=True
+    fcvt_params["spatial_mixer"]["mix_size_1"] = 11
+    fcvt_params["spatial_mixer"]["mix_size_2"]=11
+
+    fcvt_params["global_context"]["weighted_gc"] = True
+    fcvt_params["global_context"]["head"] = 8
+    fcvt_params["global_context"]["compete"] = True
+
+    fcvt_params["channel_mixer"]["useDWconv"] = True
+
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
+    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+
+    layers = [4, 4, 12, 4]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['m']
+    return model
+
+
+@register_model
+def fcvt_v5_64_B48(pretrained=False, **kwargs):
+    fcvt_params = params.copy()
+
+    fcvt_params["spatial_mixer"]["useSecondTokenMix"] = True
+    fcvt_params["spatial_mixer"]["use_globalcontext"]=True
+    fcvt_params["spatial_mixer"]["mix_size_1"] = 11
+    fcvt_params["spatial_mixer"]["mix_size_2"]=11
+
+    fcvt_params["global_context"]["weighted_gc"] = True
+    fcvt_params["global_context"]["head"] = 8
+    fcvt_params["global_context"]["compete"] = True
+
+    fcvt_params["channel_mixer"]["useDWconv"] = True
+
+    fcvt_params["spatial_mixer"]["useSpatialAtt"] = True
+    fcvt_params["channel_mixer"]["useChannelAtt"] = True
+
+    layers = [8, 8, 24, 8]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [8, 8, 4, 4]
+    downsamples = [True, True, True, True]
+
+    model = BaseFormer(
+        layers, embed_dims=embed_dims,
+        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        params = fcvt_params,
+        **kwargs)
+    model.default_cfg = default_cfgs['m']
+    return model
+
+
+
 if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
-    model = fcvt_v5_32_TTFF_W_11_11()
+    model = fcvt_v5_64_B48()
     out = model(input)
     # print(model)
     print(out.shape)
