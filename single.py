@@ -23,17 +23,18 @@ with open("imagenet1k_id_to_label.txt", "r") as f:
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Single Image Testing')
 
-parser.add_argument('--image', type=str, default="images/demo6.JPEG", help='path to image')
+parser.add_argument('--image', type=str, default="images/demo8.JPEG", help='path to image')
 parser.add_argument('--shape', type=int, default=224, help='path to image')
 
 # Model parameters
-parser.add_argument('--model', default='deit_base_patch16_224', type=str, metavar='MODEL',
+#"deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224"]
+parser.add_argument('--model', default='vit_large_patch16_224', type=str, metavar='MODEL',
                     help='Name of model to train (default: "resnet50"')
-parser.add_argument('--layer', default=11, type=int,
-                    help='Index of visualized block, 0-11')
-parser.add_argument('--head', default=9, type=int,
+parser.add_argument('--layer', default=23, type=int,
+                    help='Index of visualized block, 0-11 for base, 0-23 for large')
+parser.add_argument('--head', default=11, type=int,
                     help='Index of visualized attention head')
-parser.add_argument('--query', default=143, type=int,
+parser.add_argument('--query', default=177, type=int,
                     help='Index of query patch, ranging from (0-195), 14x14')
 
 args = parser.parse_args()
@@ -68,6 +69,16 @@ def get_attention_score(self, input, output):
     attn = attn.softmax(dim=-1)
     global attention
     attention = attn.detach()
+
+
+
+def show_query_on_image(img_path, row, col, save_path, color=[0,0,255]):
+    img = cv2.imread(img_path, 1)
+    img = cv2.resize(img, (224, 224))
+    img[row*16:(row+1)*16, col*16:(col+1)*16, 0] = color[0]
+    img[row*16:(row+1)*16, col*16:(col+1)*16, 1] = color[1]
+    img[row*16:(row+1)*16, col*16:(col+1)*16, 2] = color[2]
+    cv2.imwrite(save_path, np.uint8(img))
 
 
 
@@ -114,6 +125,7 @@ def main():
         os.makedirs(f"images/out/{args.model}/")
     except:
         pass
+    show_query_on_image(args.image, row, col, f"images/out/{args.model}/{image_name}_Q{args.query}_red.png")
     show_cam_on_image(args.image, mask, f"images/out/{args.model}/{image_name}_Q{args.query}.png",  is_query=True)
     print(f"Query image is saved to: images/out/{args.model}/{image_name}_Q{args.query}.png")
     # cv2.imwrite("images/out/save.png", raw_image)
