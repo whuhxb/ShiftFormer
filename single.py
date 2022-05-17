@@ -23,7 +23,7 @@ with open("imagenet1k_id_to_label.txt", "r") as f:
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Single Image Testing')
 
-parser.add_argument('--image', type=str, default="images/demoC.JPEG", help='path to image')
+parser.add_argument('--image', type=str, default="images/demoE.JPEG", help='path to image')
 parser.add_argument('--shape', type=int, default=224, help='path to image')
 
 # Model parameters
@@ -32,7 +32,7 @@ parser.add_argument('--model', default='vit_base_patch16_224', type=str, metavar
                     help='Name of model to train (default: "resnet50"')
 parser.add_argument('--layer', default=11, type=int,
                     help='Index of visualized block, 0-11 for base, 0-23 for large')
-parser.add_argument('--head', default=7, type=int,
+parser.add_argument('--head', default=1, type=int,
                     help='Index of visualized attention head')
 parser.add_argument('--query', default=23, type=int,
                     help='Index of query patch, ranging from (0-195), 14x14')
