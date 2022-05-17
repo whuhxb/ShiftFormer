@@ -33,7 +33,7 @@ parser.add_argument('--shape', type=int, default=224, help='path to image')
 #"deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224","cait_s24_224"]
 parser.add_argument('--model', default='fcvt_v5_64_B12', type=str, metavar='MODEL',
                     help='Name of model to train (default: "resnet50"')
-parser.add_argument('--stage', default=2, type=int,
+parser.add_argument('--stage', default=3, type=int,
                     help='Index of visualized stage, 0-3')
 parser.add_argument('--block', default=-1, type=int,
                     help='Index of visualized stage, -1 is the last block')

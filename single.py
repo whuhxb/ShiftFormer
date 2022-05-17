@@ -28,11 +28,11 @@ parser.add_argument('--shape', type=int, default=224, help='path to image')
 
 # Model parameters
 #"deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224","cait_s24_224"]
-parser.add_argument('--model', default='deit_base_distilled_patch16_224', type=str, metavar='MODEL',
+parser.add_argument('--model', default='vit_base_patch16_224', type=str, metavar='MODEL',
                     help='Name of model to train (default: "resnet50"')
 parser.add_argument('--layer', default=11, type=int,
                     help='Index of visualized block, 0-11 for base, 0-23 for large')
-parser.add_argument('--head', default=11, type=int,
+parser.add_argument('--head', default=7, type=int,
                     help='Index of visualized attention head')
 parser.add_argument('--query', default=23, type=int,
                     help='Index of query patch, ranging from (0-195), 14x14')
