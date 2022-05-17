@@ -3,7 +3,7 @@ Test single image, get the attention map of a particular layer.
 To visualize the attention map, maybe attention is meanless?
 """
 import json
-
+import models
 import timm
 import os
 import torch
@@ -13,6 +13,8 @@ import numpy as np
 import torch.nn.functional as F
 from torchvision import transforms
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+from einops import rearrange
+from torch import einsum
 
 object_categories = []
 with open("imagenet1k_id_to_label.txt", "r") as f:
@@ -28,19 +30,19 @@ parser.add_argument('--shape', type=int, default=224, help='path to image')
 
 # Model parameters
 #"deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224","cait_s24_224"]
-parser.add_argument('--model', default='deit_base_distilled_patch16_224', type=str, metavar='MODEL',
+parser.add_argument('--model', default='fcvt_v5_32_TTFF_W_11_11_H8_compete_TFF', type=str, metavar='MODEL',
                     help='Name of model to train (default: "resnet50"')
-parser.add_argument('--layer', default=11, type=int,
-                    help='Index of visualized block, 0-11 for base, 0-23 for large')
-parser.add_argument('--head', default=11, type=int,
-                    help='Index of visualized attention head')
+parser.add_argument('--stage', default=3, type=int,
+                    help='Index of visualized stage, 0-3')
+parser.add_argument('--block', default=-1, type=int,
+                    help='Index of visualized stage, -1 is the last block')
+parser.add_argument('--group', default=7, type=int,
+                    help='Index of visualized attention head, 0-7')
 parser.add_argument('--query', default=23, type=int,
                     help='Index of query patch, ranging from (0-195), 14x14')
 
 args = parser.parse_args()
 assert args.model in timm.list_models(), "Please use a timm pre-trined model, see timm.list_models()"
-assert args.model in ["deit_base_distilled_patch16_224","cait_s24_224", "deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224"], "Currently, only support Vision Transformers patch 16, size 224"
-# vit_base_patch16_224  double-check.
 
 # Preprocessing
 def _preprocess(image_path):
@@ -61,14 +63,20 @@ def get_attention_score(self, input, output):
     # https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
     # token number is 197, remove the first one, class token.
     x = input[0] # input tensor in a tuple
-    B, N, C = x.shape
-    qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
-    q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
 
-    attn = (q @ k.transpose(-2, -1)) * self.scale
-    attn = attn.softmax(dim=-1)
+    b,c,w,h = x.size()
+    x = rearrange(x,"b c x y -> b c (x y)")
+    gap = x.mean(dim=-1, keepdim=True)
+    q, g = map(lambda t: rearrange(t, 'b (h d) n -> b h d n', h = self.head), [x,gap])  #[b,head, hdim, n]
+    sim = einsum('bhdi,bhjd->bhij', q, g.transpose(-1, -2)).squeeze(dim=-1) * self.scale  #[b,head, w*h]
+    std, mean = torch.std_mean(sim, dim=[1,2], keepdim=True)
+    sim = (sim-mean)/(std+self.epsilon)
+    sim = sim * self.rescale_weight.unsqueeze(dim=0).unsqueeze(dim=-1) + self.rescale_bias.unsqueeze(dim=0).unsqueeze(dim=-1)
+    sim = sim.reshape(b,self.head,1, w, h) # [b, head, 1, w, h]
+    sim = sim.squeeze(dim=2)# [b, head, w, h]
+
     global attention
-    attention = attn.detach()
+    attention = sim.detach()
 
 
 
@@ -103,7 +111,7 @@ def main():
     image, raw_image = _preprocess(args.image)
     image = image.unsqueeze(dim=0)
     model = timm.create_model(model_name=args.model,pretrained=True)
-    model.blocks[args.layer].attn.register_forward_hook(get_attention_score)
+    model.network[args.stage*2][args.block].token_mixer.gc2.register_forward_hook(get_attention_score)
     out = model(image)
     if type(out) is tuple:
         out =out[0]
@@ -111,39 +119,19 @@ def main():
     value, index = torch.max(out, dim=1)
     print(f'Prediction is: {object_categories[index]} possibility: {possibility*100:.3f}%')
 
-
-
-    image_name = os.path.basename(args.image).split(".")[0]
-    # save query image
-    mask = torch.zeros(1,1,14,14)
-    row = int(args.query/14)
-    col = args.query%14
-    mask[0, 0, row, col] = 1.0
-    mask = F.interpolate(mask,(224,224))
-    mask = mask.squeeze(dim=0).permute(1,2,0)
     try:
         os.makedirs(f"images/out/{args.model}/")
     except:
         pass
-    show_query_on_image(args.image, row, col, f"images/out/{args.model}/{image_name}_Q{args.query}_red.png")
-    show_cam_on_image(args.image, mask, f"images/out/{args.model}/{image_name}_Q{args.query}.png",  is_query=True)
-    print(f"Query image is saved to: images/out/{args.model}/{image_name}_Q{args.query}.png")
-    # cv2.imwrite("images/out/save.png", raw_image)
-
-
-
-    # process the attention map [tokens, tokens], remove the class_token (first token)
-    attention = attention[0, args.head, :, :]
-    if attention.shape[0] !=196:
-        attention= attention[1:, 1:] # remove cls token
-    if attention.shape[0] !=196:
-        attention= attention[1:, 1:] # remove distill token
-    mask = (attention[args.query,:]).reshape(14,14).unsqueeze(dim=0).unsqueeze(dim=0)
+    image_name = os.path.basename(args.image).split(".")[0]
+    # process the attention map
+    attention = attention[0, args.group, :, :]
+    mask = attention.unsqueeze(dim=0).unsqueeze(dim=0)
     mask = F.interpolate(mask,(224,224))
     mask = mask.squeeze(dim=0).permute(1,2,0)
     mask = (mask -mask.min())/(mask.max()-mask.min()) # normalize to 0-1
-    show_cam_on_image(args.image, mask, f"images/out/{args.model}/{image_name}_Q{args.query}_L{args.layer}_H{args.head}.png",  is_query=False)
-    print(f"Atten image is saved to: images/out/{args.model}/{image_name}_Q{args.query}_L{args.layer}_H{args.head}.png")
+    show_cam_on_image(args.image, mask, f"images/out/{args.model}/{image_name}_S{args.stage}_B{args.block}_G{args.group}.png",  is_query=False)
+    print(f"Atten image is saved to: images/out/{args.model}/{image_name}_S{args.stage}_B{args.block}_G{args.group}.png")
     # print(f"attention shape is {attention.shape}")
 
 

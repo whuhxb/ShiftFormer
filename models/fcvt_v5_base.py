@@ -1268,6 +1268,6 @@ if __name__ == '__main__':
     input = torch.rand(2, 3, 224, 224)
     model = fcvt_v5_64_B48()
     out = model(input)
-    # print(model)
+    print(model)
     print(out.shape)
 
