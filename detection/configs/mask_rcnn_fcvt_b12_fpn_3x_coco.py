@@ -4,6 +4,8 @@ _base_ = [
     '_base_/schedules/schedule_1x.py',
     '_base_/default_runtime.py'
 ]
+
+data_root = '/dev/shm/'
 # optimizer
 model = dict(
     # pretrained='https://github.com/sail-sg/poolformer/releases/download/v1.0/poolformer_s24.pth.tar', # for old version of mmdetection
