@@ -12,7 +12,7 @@ model = dict(
         init_cfg=dict(
             type='Pretrained',
             checkpoint=\
-                'https://web.northeastern.edu/smilelab/xuma/fcvt_b12/model_best.pth.tar',
+                'https://web.northeastern.edu/smilelab/xuma/fcvt_b12/fcvt_b12.pth.tar',
             ),
         ),
     neck=dict(
