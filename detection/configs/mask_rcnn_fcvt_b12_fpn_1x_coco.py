@@ -20,6 +20,10 @@ model = dict(
         in_channels=[64, 128, 320, 512],
         out_channels=256,
         num_outs=5))
+
+
+
+
 # optimizer
 optimizer = dict(_delete_=True, type='AdamW', lr=0.0002, weight_decay=0.0001)
 # do not use mmdet version fp16
