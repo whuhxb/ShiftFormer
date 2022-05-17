@@ -14,8 +14,8 @@ model = dict(
         style='pytorch',
         init_cfg=dict(
             type='Pretrained', 
-            # checkpoint=\
-            #     'https://github.com/sail-sg/poolformer/releases/download/v1.0/poolformer_s24.pth.tar',
+            checkpoint=\
+                'https://web.northeastern.edu/smilelab/xuma/model_best.pth.tar',
             ),
         ),
     neck=dict(
