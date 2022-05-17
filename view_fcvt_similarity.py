@@ -15,6 +15,7 @@ from torchvision import transforms
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from einops import rearrange
 from torch import einsum
+from timm.models import create_model, apply_test_time_pool, load_checkpoint, is_model, list_models
 
 object_categories = []
 with open("imagenet1k_id_to_label.txt", "r") as f:
@@ -30,9 +31,9 @@ parser.add_argument('--shape', type=int, default=224, help='path to image')
 
 # Model parameters
 #"deit_base_patch16_224", "vit_large_patch16_224", "vit_base_patch16_224","cait_s24_224"]
-parser.add_argument('--model', default='fcvt_v5_32_TTFF_W_11_11_H8_compete_TFF', type=str, metavar='MODEL',
+parser.add_argument('--model', default='fcvt_v5_64_B12', type=str, metavar='MODEL',
                     help='Name of model to train (default: "resnet50"')
-parser.add_argument('--stage', default=3, type=int,
+parser.add_argument('--stage', default=2, type=int,
                     help='Index of visualized stage, 0-3')
 parser.add_argument('--block', default=-1, type=int,
                     help='Index of visualized stage, -1 is the last block')
@@ -40,8 +41,12 @@ parser.add_argument('--group', default=7, type=int,
                     help='Index of visualized attention head, 0-7')
 parser.add_argument('--query', default=23, type=int,
                     help='Index of query patch, ranging from (0-195), 14x14')
+parser.add_argument('--checkpoint', default='', type=str, metavar='PATH',
+                    help='path to latest checkpoint (default: none)')
 
 args = parser.parse_args()
+# default setting of args.checkpoint
+args.checkpoint = f"./images/out/{args.model}.tar"
 assert args.model in timm.list_models(), "Please use a timm pre-trined model, see timm.list_models()"
 
 # Preprocessing
@@ -111,6 +116,8 @@ def main():
     image, raw_image = _preprocess(args.image)
     image = image.unsqueeze(dim=0)
     model = timm.create_model(model_name=args.model,pretrained=True)
+    if args.checkpoint:
+        load_checkpoint(model, args.checkpoint, True)
     model.network[args.stage*2][args.block].token_mixer.gc2.register_forward_hook(get_attention_score)
     out = model(image)
     if type(out) is tuple:
