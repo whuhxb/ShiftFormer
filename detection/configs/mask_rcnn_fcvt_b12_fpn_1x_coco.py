@@ -7,7 +7,7 @@ _base_ = [
 # optimizer
 model = dict(
     backbone=dict(
-        type='fcvt_b24_feat',
+        type='fcvt_b12_feat',
         style='pytorch',
         init_cfg=dict(
             type='Pretrained',
