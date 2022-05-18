@@ -67,7 +67,7 @@ class ConvNeXt(nn.Module):
                  layer_scale_init_value=1e-6, head_init_scale=1.,
                  ):
         super().__init__()
-
+        self.num_classes = num_classes
         self.downsample_layers = nn.ModuleList() # stem and 3 intermediate downsampling conv layers
         stem = nn.Sequential(
             nn.Conv2d(in_chans, dims[0], kernel_size=4, stride=4),
