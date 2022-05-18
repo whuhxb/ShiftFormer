@@ -1,5 +1,6 @@
 from timm.models import *
 from .poolformer import *
+from .convnext import convnext_base, convnext_tiny
 # from .shiftVIT import shiftvit_light_base
 # from .model1_static_shift import model1_static_shiftformer_s12, model1_static_shiftformer_s12_n8, \
 #     model1_static_shiftformer_s12_n16, model1_static_shiftformer_s24
