@@ -1,3 +1,19 @@
+# Copyright 2021 Garena Online Private Limited
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+PoolFormer implementation
+"""
 import os
 import copy
 import torch
@@ -15,7 +31,7 @@ try:
     from mmcv.runner import _load_checkpoint
     has_mmseg = True
 except ImportError:
-    # print("If for semantic segmentation, please install mmsegmentation first")
+    print("If for semantic segmentation, please install mmsegmentation first")
     has_mmseg = False
 
 try:
@@ -24,7 +40,7 @@ try:
     from mmcv.runner import _load_checkpoint
     has_mmdet = True
 except ImportError:
-    # print("If for detection, please install mmdetection first")
+    print("If for detection, please install mmdetection first")
     has_mmdet = False
 
 
@@ -33,26 +49,31 @@ def _cfg(url='', **kwargs):
         'url': url,
         'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': None,
         'crop_pct': .95, 'interpolation': 'bicubic',
-        'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
+        'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD, 
         'classifier': 'head',
         **kwargs
     }
 
 
+default_cfgs = {
+    'poolformer_s': _cfg(crop_pct=0.9),
+    'poolformer_m': _cfg(crop_pct=0.95),
+}
+
 
 class PatchEmbed(nn.Module):
     """
-    Patch Embedding that is implemented by a layer of conv.
+    Patch Embedding that is implemented by a layer of conv. 
     Input: tensor in shape [B, C, H, W]
     Output: tensor in shape [B, C, H/stride, W/stride]
     """
-    def __init__(self, patch_size=16, stride=16, padding=0,
+    def __init__(self, patch_size=16, stride=16, padding=0, 
                  in_chans=3, embed_dim=768, norm_layer=None):
         super().__init__()
         patch_size = to_2tuple(patch_size)
         stride = to_2tuple(stride)
         padding = to_2tuple(padding)
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size,
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, 
                               stride=stride, padding=padding)
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
 
@@ -110,7 +131,7 @@ class Mlp(nn.Module):
     Implementation of MLP with 1*1 convolutions.
     Input: tensor with shape [B, C, H, W]
     """
-    def __init__(self, in_features, hidden_features=None,
+    def __init__(self, in_features, hidden_features=None, 
                  out_features=None, act_layer=nn.GELU, drop=0.):
         super().__init__()
         out_features = out_features or in_features
@@ -145,14 +166,14 @@ class PoolFormerBlock(nn.Module):
     --act_layer: activation
     --norm_layer: normalization
     --drop: dropout rate
-    --drop path: Stochastic Depth,
+    --drop path: Stochastic Depth, 
         refer to https://arxiv.org/abs/1603.09382
-    --use_layer_scale, --layer_scale_init_value: LayerScale,
+    --use_layer_scale, --layer_scale_init_value: LayerScale, 
         refer to https://arxiv.org/abs/2103.17239
     """
-    def __init__(self, dim, pool_size=3, mlp_ratio=4.,
-                 act_layer=nn.GELU, norm_layer=GroupNorm,
-                 drop=0., drop_path=0.,
+    def __init__(self, dim, pool_size=3, mlp_ratio=4., 
+                 act_layer=nn.GELU, norm_layer=GroupNorm, 
+                 drop=0., drop_path=0., 
                  use_layer_scale=True, layer_scale_init_value=1e-5):
 
         super().__init__()
@@ -161,7 +182,7 @@ class PoolFormerBlock(nn.Module):
         self.token_mixer = Pooling(pool_size=pool_size)
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
-        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim,
+        self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, 
                        act_layer=act_layer, drop=drop)
 
         # The following two techniques are useful to train deep PoolFormers.
@@ -188,25 +209,25 @@ class PoolFormerBlock(nn.Module):
         return x
 
 
-def basic_blocks(dim, index, layers,
-                 pool_size=3, mlp_ratio=4.,
-                 act_layer=nn.GELU, norm_layer=GroupNorm,
-                 drop_rate=.0, drop_path_rate=0.,
+def basic_blocks(dim, index, layers, 
+                 pool_size=3, mlp_ratio=4., 
+                 act_layer=nn.GELU, norm_layer=GroupNorm, 
+                 drop_rate=.0, drop_path_rate=0., 
                  use_layer_scale=True, layer_scale_init_value=1e-5):
     """
     generate PoolFormer blocks for a stage
-    return: PoolFormer blocks
+    return: PoolFormer blocks 
     """
     blocks = []
     for block_idx in range(layers[index]):
         block_dpr = drop_path_rate * (
             block_idx + sum(layers[:index])) / (sum(layers) - 1)
         blocks.append(PoolFormerBlock(
-            dim, pool_size=pool_size, mlp_ratio=mlp_ratio,
-            act_layer=act_layer, norm_layer=norm_layer,
-            drop=drop_rate, drop_path=block_dpr,
-            use_layer_scale=use_layer_scale,
-            layer_scale_init_value=layer_scale_init_value,
+            dim, pool_size=pool_size, mlp_ratio=mlp_ratio, 
+            act_layer=act_layer, norm_layer=norm_layer, 
+            drop=drop_rate, drop_path=block_dpr, 
+            use_layer_scale=use_layer_scale, 
+            layer_scale_init_value=layer_scale_init_value, 
             ))
     blocks = nn.Sequential(*blocks)
 
@@ -217,31 +238,31 @@ class PoolFormer(nn.Module):
     """
     PoolFormer, the main class of our model
     --layers: [x,x,x,x], number of blocks for the 4 stages
-    --embed_dims, --mlp_ratios, --pool_size: the embedding dims, mlp ratios and
+    --embed_dims, --mlp_ratios, --pool_size: the embedding dims, mlp ratios and 
         pooling size for the 4 stages
     --downsamples: flags to apply downsampling or not
     --norm_layer, --act_layer: define the types of normalization and activation
     --num_classes: number of classes for the image classification
     --in_patch_size, --in_stride, --in_pad: specify the patch embedding
         for the input image
-    --down_patch_size --down_stride --down_pad:
+    --down_patch_size --down_stride --down_pad: 
         specify the downsample (patch embed.)
     --fork_feat: whether output features of the 4 stages, for dense prediction
-    --init_cfg, --pretrained:
+    --init_cfg, --pretrained: 
         for mmdetection and mmsegmentation to load pretrained weights
     """
-    def __init__(self, layers, embed_dims=None,
-                 mlp_ratios=None, downsamples=None,
-                 pool_size=3,
-                 norm_layer=GroupNorm, act_layer=nn.GELU,
+    def __init__(self, layers, embed_dims=None, 
+                 mlp_ratios=None, downsamples=None, 
+                 pool_size=3, 
+                 norm_layer=GroupNorm, act_layer=nn.GELU, 
                  num_classes=1000,
-                 in_patch_size=7, in_stride=4, in_pad=2,
-                 down_patch_size=3, down_stride=2, down_pad=1,
+                 in_patch_size=7, in_stride=4, in_pad=2, 
+                 down_patch_size=3, down_stride=2, down_pad=1, 
                  drop_rate=0., drop_path_rate=0.,
-                 use_layer_scale=True, layer_scale_init_value=1e-5,
+                 use_layer_scale=True, layer_scale_init_value=1e-5, 
                  fork_feat=False,
-                 init_cfg=None,
-                 pretrained=None,
+                 init_cfg=None, 
+                 pretrained=None, 
                  **kwargs):
 
         super().__init__()
@@ -251,18 +272,18 @@ class PoolFormer(nn.Module):
         self.fork_feat = fork_feat
 
         self.patch_embed = PatchEmbed(
-            patch_size=in_patch_size, stride=in_stride, padding=in_pad,
+            patch_size=in_patch_size, stride=in_stride, padding=in_pad, 
             in_chans=3, embed_dim=embed_dims[0])
 
         # set the main block in network
         network = []
         for i in range(len(layers)):
-            stage = basic_blocks(embed_dims[i], i, layers,
+            stage = basic_blocks(embed_dims[i], i, layers, 
                                  pool_size=pool_size, mlp_ratio=mlp_ratios[i],
-                                 act_layer=act_layer, norm_layer=norm_layer,
-                                 drop_rate=drop_rate,
+                                 act_layer=act_layer, norm_layer=norm_layer, 
+                                 drop_rate=drop_rate, 
                                  drop_path_rate=drop_path_rate,
-                                 use_layer_scale=use_layer_scale,
+                                 use_layer_scale=use_layer_scale, 
                                  layer_scale_init_value=layer_scale_init_value)
             network.append(stage)
             if i >= len(layers) - 1:
@@ -271,8 +292,8 @@ class PoolFormer(nn.Module):
                 # downsampling between two stages
                 network.append(
                     PatchEmbed(
-                        patch_size=down_patch_size, stride=down_stride,
-                        padding=down_pad,
+                        patch_size=down_patch_size, stride=down_stride, 
+                        padding=down_pad, 
                         in_chans=embed_dims[i], embed_dim=embed_dims[i+1]
                         )
                     )
@@ -303,7 +324,7 @@ class PoolFormer(nn.Module):
         self.apply(self.cls_init_weights)
 
         self.init_cfg = copy.deepcopy(init_cfg)
-        # load pre-trained model
+        # load pre-trained model 
         if self.fork_feat and (
                 self.init_cfg is not None or pretrained is not None):
             self.init_weights()
@@ -315,7 +336,7 @@ class PoolFormer(nn.Module):
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
-    # init for mmdetection or mmsegmentation by loading
+    # init for mmdetection or mmsegmentation by loading 
     # imagenet pre-trained weights
     def init_weights(self, pretrained=None):
         logger = get_root_logger()
@@ -346,7 +367,7 @@ class PoolFormer(nn.Module):
             state_dict = _state_dict
             missing_keys, unexpected_keys = \
                 self.load_state_dict(state_dict, False)
-
+            
             # show for debug
             # print('missing_keys: ', missing_keys)
             # print('unexpected_keys: ', unexpected_keys)
@@ -391,12 +412,21 @@ class PoolFormer(nn.Module):
         return cls_out
 
 
+model_urls = {
+    "poolformer_s12": "https://github.com/sail-sg/poolformer/releases/download/v1.0/poolformer_s12.pth.tar",
+    "poolformer_s24": "https://github.com/sail-sg/poolformer/releases/download/v1.0/poolformer_s24.pth.tar",
+    "poolformer_s36": "https://github.com/sail-sg/poolformer/releases/download/v1.0/poolformer_s36.pth.tar",
+    "poolformer_m36": "https://github.com/sail-sg/poolformer/releases/download/v1.0/poolformer_m36.pth.tar",
+    "poolformer_m48": "https://github.com/sail-sg/poolformer/releases/download/v1.0/poolformer_m48.pth.tar",
+}
+
+
 @register_model
 def poolformer_s12(pretrained=False, **kwargs):
     """
     PoolFormer-S12 model, Params: 12M
     --layers: [x,x,x,x], numbers of layers for the four stages
-    --embed_dims, --mlp_ratios:
+    --embed_dims, --mlp_ratios: 
         embedding dims and mlp ratios for the four stages
     --downsamples: flags to apply downsampling or not in four blocks
     """
@@ -405,15 +435,193 @@ def poolformer_s12(pretrained=False, **kwargs):
     mlp_ratios = [4, 4, 4, 4]
     downsamples = [True, True, True, True]
     model = PoolFormer(
-        layers, embed_dims=embed_dims,
-        mlp_ratios=mlp_ratios, downsamples=downsamples,
+        layers, embed_dims=embed_dims, 
+        mlp_ratios=mlp_ratios, downsamples=downsamples, 
         **kwargs)
     model.default_cfg = default_cfgs['poolformer_s']
+    if pretrained:
+        url = model_urls['poolformer_s12']
+        checkpoint = torch.hub.load_state_dict_from_url(url=url, map_location="cpu", check_hash=True)
+        model.load_state_dict(checkpoint)
     return model
 
 
+@register_model
+def poolformer_s24(pretrained=False, **kwargs):
+    """
+    PoolFormer-S24 model, Params: 21M
+    """
+    layers = [4, 4, 12, 4]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims, 
+        mlp_ratios=mlp_ratios, downsamples=downsamples, 
+        **kwargs)
+    model.default_cfg = default_cfgs['poolformer_s']
+    if pretrained:
+        url = model_urls['poolformer_s24']
+        checkpoint = torch.hub.load_state_dict_from_url(url=url, map_location="cpu", check_hash=True)
+        model.load_state_dict(checkpoint)
+    return model
 
 
+@register_model
+def poolformer_s36(pretrained=False, **kwargs):
+    """
+    PoolFormer-S36 model, Params: 31M
+    """
+    layers = [6, 6, 18, 6]
+    embed_dims = [64, 128, 320, 512]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims, 
+        mlp_ratios=mlp_ratios, downsamples=downsamples, 
+        layer_scale_init_value=1e-6, 
+        **kwargs)
+    model.default_cfg = default_cfgs['poolformer_s']
+    if pretrained:
+        url = model_urls['poolformer_s36']
+        checkpoint = torch.hub.load_state_dict_from_url(url=url, map_location="cpu", check_hash=True)
+        model.load_state_dict(checkpoint)
+    return model
 
 
+@register_model
+def poolformer_m36(pretrained=False, **kwargs):
+    """
+    PoolFormer-M36 model, Params: 56M
+    """
+    layers = [6, 6, 18, 6]
+    embed_dims = [96, 192, 384, 768]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims, 
+        mlp_ratios=mlp_ratios, downsamples=downsamples, 
+        layer_scale_init_value=1e-6, 
+        **kwargs)
+    model.default_cfg = default_cfgs['poolformer_m']
+    if pretrained:
+        url = model_urls['poolformer_m36']
+        checkpoint = torch.hub.load_state_dict_from_url(url=url, map_location="cpu", check_hash=True)
+        model.load_state_dict(checkpoint)
+    return model
 
+
+@register_model
+def poolformer_m48(pretrained=False, **kwargs):
+    """
+    PoolFormer-M48 model, Params: 73M
+    """
+    layers = [8, 8, 24, 8]
+    embed_dims = [96, 192, 384, 768]
+    mlp_ratios = [4, 4, 4, 4]
+    downsamples = [True, True, True, True]
+    model = PoolFormer(
+        layers, embed_dims=embed_dims, 
+        mlp_ratios=mlp_ratios, downsamples=downsamples, 
+        layer_scale_init_value=1e-6, 
+        **kwargs)
+    model.default_cfg = default_cfgs['poolformer_m']
+    if pretrained:
+        url = model_urls['poolformer_m48']
+        checkpoint = torch.hub.load_state_dict_from_url(url=url, map_location="cpu", check_hash=True)
+        model.load_state_dict(checkpoint)
+    return model
+
+
+if has_mmseg and has_mmdet:
+    """
+    The following models are for dense prediction based on 
+    mmdetection and mmsegmentation
+    """
+    @seg_BACKBONES.register_module()
+    @det_BACKBONES.register_module()
+    class poolformer_s12_feat(PoolFormer):
+        """
+        PoolFormer-S12 model, Params: 12M
+        """
+        def __init__(self, **kwargs):
+            layers = [2, 2, 6, 2]
+            embed_dims = [64, 128, 320, 512]
+            mlp_ratios = [4, 4, 4, 4]
+            downsamples = [True, True, True, True]
+            super().__init__(
+                layers, embed_dims=embed_dims, 
+                mlp_ratios=mlp_ratios, downsamples=downsamples, 
+                fork_feat=True,
+                **kwargs)
+
+    @seg_BACKBONES.register_module()
+    @det_BACKBONES.register_module()
+    class poolformer_s24_feat(PoolFormer):
+        """
+        PoolFormer-S24 model, Params: 21M
+        """
+        def __init__(self, **kwargs):
+            layers = [4, 4, 12, 4]
+            embed_dims = [64, 128, 320, 512]
+            mlp_ratios = [4, 4, 4, 4]
+            downsamples = [True, True, True, True]
+            super().__init__(
+                layers, embed_dims=embed_dims, 
+                mlp_ratios=mlp_ratios, downsamples=downsamples, 
+                fork_feat=True,
+                **kwargs)
+
+    @seg_BACKBONES.register_module()
+    @det_BACKBONES.register_module()
+    class poolformer_s36_feat(PoolFormer):
+        """
+        PoolFormer-S36 model, Params: 31M
+        """
+        def __init__(self, **kwargs):
+            layers = [6, 6, 18, 6]
+            embed_dims = [64, 128, 320, 512]
+            mlp_ratios = [4, 4, 4, 4]
+            downsamples = [True, True, True, True]
+            super().__init__(
+                layers, embed_dims=embed_dims, 
+                mlp_ratios=mlp_ratios, downsamples=downsamples, 
+                layer_scale_init_value=1e-6, 
+                fork_feat=True,
+                **kwargs)
+
+    @seg_BACKBONES.register_module()
+    @det_BACKBONES.register_module()
+    class poolformer_m36_feat(PoolFormer):
+        """
+        PoolFormer-S36 model, Params: 56M
+        """
+        def __init__(self, **kwargs):
+            layers = [6, 6, 18, 6]
+            embed_dims = [96, 192, 384, 768]
+            mlp_ratios = [4, 4, 4, 4]
+            downsamples = [True, True, True, True]
+            super().__init__(
+                layers, embed_dims=embed_dims, 
+                mlp_ratios=mlp_ratios, downsamples=downsamples, 
+                layer_scale_init_value=1e-6, 
+                fork_feat=True,
+                **kwargs)
+
+    @seg_BACKBONES.register_module()
+    @det_BACKBONES.register_module()
+    class poolformer_m48_feat(PoolFormer):
+        """
+        PoolFormer-M48 model, Params: 73M
+        """
+        def __init__(self, **kwargs):
+            layers = [8, 8, 24, 8]
+            embed_dims = [96, 192, 384, 768]
+            mlp_ratios = [4, 4, 4, 4]
+            downsamples = [True, True, True, True]
+            super().__init__(
+                layers, embed_dims=embed_dims, 
+                mlp_ratios=mlp_ratios, downsamples=downsamples, 
+                layer_scale_init_value=1e-6, 
+                fork_feat=True,
+                **kwargs)
