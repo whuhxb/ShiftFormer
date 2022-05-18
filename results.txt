@@ -56,8 +56,8 @@ fct_s12_64_7118_TTT_ChannelConv	80.23999
 
 
 
-
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fct14_s12_64_7478_FFF -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
+33,63,133,193
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 ./distributed_train.sh 8 /dev/shm/imagenet/ --model fcvt_v6_64_B12 -b 128 --lr 1e-3 --drop-path 0.1 --apex-amp
 
 speed baseline
 fct_s12_64_7478_FFF			79.594		4483.86/s  ==fct_s12_64_7118_FFF
@@ -246,3 +246,7 @@ H32
           25830135 ai-jumpst      fcvt_v5_32_TTFF_W_11_11_H8_compete_TFT_ema.sh   ma.xu1  R   21:55:49      1 d3146
           25827655 ai-jumpst                                               bash   ma.xu1  R   23:58:44      1 d3150
 
+
+
+
+python3 validate.py /dev/shm/imagenet  --model resnet50 -b 128
