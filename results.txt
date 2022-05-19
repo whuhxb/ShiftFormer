@@ -249,4 +249,7 @@ H32
 
 
 
-python3 validate.py /dev/shm/imagenet  --model resnet50 -b 128
+python3 validate.py /dev/shm/imagenet  --model deit_base_patch16_224 -b 128
+
+
+salloc -N 1 -p ai-jumpstart --gres=gpu:1 --cpus-per-task=64 --mem=256Gb --nodelist=d3150
