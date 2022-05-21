@@ -1,5 +1,15 @@
 import torch
 import torch.nn.functional as F
+import  torch.nn as nn
+
+x = torch.rand(1,3,4,4)
+net = nn.Conv2d(3,3,1)
+net.eval()
+out1= net(x).mean(dim=-1).mean(dim=-1)
+out2 =net(x.mean(dim=-1,keepdim=True).mean(dim=-2,keepdim=True))
+print(out1)
+print(out2)
+
 
 
 def main(kernel):
