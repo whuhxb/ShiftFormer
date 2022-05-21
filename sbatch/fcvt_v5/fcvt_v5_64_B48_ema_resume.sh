@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=512Gb
-#SBATCH --time=1-23:59:00
+#SBATCH --time=1-13:59:00
 #SBATCH --output=%j_fcvt_v5_64_B48_resume.log
 
 source activate timm
