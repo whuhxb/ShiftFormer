@@ -78,7 +78,7 @@ change 3x3DW in C-M to identy		2616.04/s
 
 
 
-
+Confirmation code: AUTFSZ
 
 
 demo1-6  Q： 23 83 98 143  Head: 0 3 6 9
